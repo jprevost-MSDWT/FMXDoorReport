@@ -1,3 +1,8 @@
+// Project Name: Door Report Full
+// Project Version: 2.0
+// Filename: Stage0 - Launcher.gs
+// File Version: 2.01
+
 const CONFIG = {
   sheets: {
     import: "Import",
@@ -84,3 +89,4 @@ function Stage2(){
 function Stage3(){
   copySelectedDataToAutoReport();
 }
+
