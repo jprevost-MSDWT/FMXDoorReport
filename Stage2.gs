@@ -1,3 +1,8 @@
+// Project Name: Door Report Full
+// Project Version: 2.0
+// Filename: Stage2.gs
+// File Version: 2.01
+
 /**
  * =======================================================================================
  * STAGE 2 - FILTER SCRIPT (Version 3.01)
