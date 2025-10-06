@@ -4,7 +4,7 @@ const CONFIG = {
     helper1: "Output-Helper1",
     helper2: "Output-Helper2",
     report: "AutoReport",
-    reportNotes: "AutoReport-Notes",
+    reportNotes: "AutoReport w/Notes",
     data: "Data"
   },
   reportRanges: {
