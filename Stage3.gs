@@ -19,8 +19,8 @@ function copySelectedDataToAutoReport() {
 
   const selectedRows = sourceData.filter(row => row[selectedColumnIndex] === true);
 
-  processAndWriteData(ss, sourceHeaders, selectedRows, "AutoReport", false);
-  processAndWriteData(ss, sourceHeaders, selectedRows, "AutoReport w/Notes", true);
+  processAndWriteData(ss, sourceHeaders, selectedRows, CONFIG.sheets.report, false);
+  processAndWriteData(ss, sourceHeaders, selectedRows, CONFIG.sheets.reportNotes, true);
 }
 
 function processAndWriteData(ss, sourceHeaders, selectedRows, destinationSheetName, includeAllColumns) {
@@ -201,3 +201,4 @@ function trimSheet(sheetName) {
     sheet.deleteColumns(lastCol + 1, maxCols - lastCol);
   }
 }
+

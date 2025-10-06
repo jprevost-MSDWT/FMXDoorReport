@@ -1,22 +1,26 @@
-// Stage1.gs (Stage 1 - Main Processing Script)
+// Project Name: Door Report Full
+// Project Version: 1.04
+// Filename: Stage1.gs
+// File Version: 1.01
+
 // This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes duplicates, and sorts.
 
 function FMX_Doors_AutoImport_V8() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var inputSheet = ss.getSheetByName("Import");
-  var outputSheet = ss.getSheetByName("Output-Helper1");
-  var dataSheet = ss.getSheetByName("Data");
+  var inputSheet = ss.getSheetByName(CONFIG.sheets.import);
+  var outputSheet = ss.getSheetByName(CONFIG.sheets.helper1);
+  var dataSheet = ss.getSheetByName(CONFIG.sheets.data);
 
   if (!inputSheet) {
-    console.error('Error: Source sheet "Import" not found!');
+    console.error('Error: Source sheet "' + CONFIG.sheets.import + '" not found!');
     return;
   }
   if (!outputSheet) {
-    console.error('Error: Destination sheet "Output-Helper1" not found!');
+    console.error('Error: Destination sheet "' + CONFIG.sheets.helper1 + '" not found!');
     return;
   }
   if (!dataSheet) {
-    console.error('Error: Lookup sheet "Data" not found!');
+    console.error('Error: Lookup sheet "' + CONFIG.sheets.data + '" not found!');
     return;
   }
 
@@ -307,3 +311,4 @@ function combineDoorValues(row, columnNames, indexes) {
   }
   return currentDoors.join(", ");
 }
+
