@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
-// Project Version: 1.03
+// Project Version: 1.04
 // Filename: Door Report ALL.gs
-// File Version: 1.16
+// File Version: 1.17
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -197,25 +197,24 @@ function importData(fileContent, fileType) {
 // --- BEGIN Inserted Code from Stage1.gs ---
 // =======================================================================================
 
-// Stage1.gs (Stage 1 - Main Processing Script)
 // This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes duplicates, and sorts.
 
 function FMX_Doors_AutoImport_V8() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var inputSheet = ss.getSheetByName("Import");
-  var outputSheet = ss.getSheetByName("Output-Helper1");
-  var dataSheet = ss.getSheetByName("Data");
+  var inputSheet = ss.getSheetByName(CONFIG.sheets.import);
+  var outputSheet = ss.getSheetByName(CONFIG.sheets.helper1);
+  var dataSheet = ss.getSheetByName(CONFIG.sheets.data);
 
   if (!inputSheet) {
-    console.error('Error: Source sheet "Import" not found!');
+    console.error('Error: Source sheet "' + CONFIG.sheets.import + '" not found!');
     return;
   }
   if (!outputSheet) {
-    console.error('Error: Destination sheet "Output-Helper1" not found!');
+    console.error('Error: Destination sheet "' + CONFIG.sheets.helper1 + '" not found!');
     return;
   }
   if (!dataSheet) {
-    console.error('Error: Lookup sheet "Data" not found!');
+    console.error('Error: Lookup sheet "' + CONFIG.sheets.data + '" not found!');
     return;
   }
 
@@ -904,15 +903,14 @@ function calculateTargetDate() {
 // --- BEGIN Inserted Code from Stage3.gs ---
 // =======================================================================================
 
-// Stage3.gs (Stage 3 - Copy, Format, and Trim for Reporting)
 // This script generates two reports ("AutoReport" and "AutoReport w/Notes") from Output-Helper2, applying formatting and trimming.
 
 function copySelectedDataToAutoReport() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sourceSheet = ss.getSheetByName("Output-Helper2");
+  const sourceSheet = ss.getSheetByName(CONFIG.sheets.helper2);
 
   if (!sourceSheet) {
-    throw new Error('The sheet "Output-Helper2" was not found. Please check the name and try again.');
+    throw new Error('The sheet "' + CONFIG.sheets.helper2 + '" was not found. Please check the name and try again.');
   }
 
   const sourceData = sourceSheet.getDataRange().getValues();
@@ -920,7 +918,7 @@ function copySelectedDataToAutoReport() {
 
   const selectedColumnIndex = sourceHeaders.indexOf("Selected");
   if (selectedColumnIndex === -1) {
-    throw new Error('A column named "Selected" was not found in "Output-Helper2".');
+    throw new Error('A column named "Selected" was not found in "' + CONFIG.sheets.helper2 + '".');
   }
 
   const selectedRows = sourceData.filter(row => row[selectedColumnIndex] === true);
@@ -954,7 +952,7 @@ function processAndWriteData(ss, sourceHeaders, selectedRows, destinationSheetNa
   const sourceColumnIndices = columnMapping.map(mapping => {
     const index = sourceHeaders.indexOf(mapping.source);
     if (index === -1) {
-      throw new Error(`Column "${mapping.source}" not found in "Output-Helper2".`);
+      throw new Error(`Column "${mapping.source}" not found in "` + CONFIG.sheets.helper2 + `".`);
     }
     return index;
   });
@@ -1110,5 +1108,4 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
-
 
