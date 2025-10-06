@@ -1,3 +1,8 @@
+// Project Name: Door Report Full
+// Project Version: 1.04
+// Filename: Stage0 Import.gs
+// File Version: 1.01
+
 function runSecondScript() {
   showImportDialog();
 }
@@ -81,3 +86,4 @@ function importData(fileContent, fileType) {
     return 'Error: Could not parse the file. Please ensure it is a valid CSV or TXT file.';
   }
 }
+
