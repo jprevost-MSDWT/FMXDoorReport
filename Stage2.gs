@@ -1,383 +1,208 @@
 // Project Name: Door Report Full
 // Project Version: 2.0
-// Filename: Stage2.gs
+// Filename: Stage3.gs
 // File Version: 2.01
 
-/**
- * =======================================================================================
- * STAGE 2 - FILTER SCRIPT (Version 3.01)
- * =======================================================================================
- * This script filters data from Stage1, removes duplicates, sorts it, and applies formatting.
- */
-function stage2_filterProcessedData() {
-  // Get the active spreadsheet and the relevant sheets
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sourceSheet = ss.getSheetByName(CONFIG.sheets.helper1); // Data from Stage1
-  var destinationSheet = ss.getSheetByName(CONFIG.sheets.helper2); // Where the filtered data will go
+// This script generates two reports ("AutoReport" and "AutoReport w/Notes") from Output-Helper2, applying formatting and trimming.
 
-  // Basic error handling to ensure sheets exist
+function copySelectedDataToAutoReport() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sourceSheet = ss.getSheetByName(CONFIG.sheets.helper2);
+
   if (!sourceSheet) {
-    console.error('Error: Source sheet "' + CONFIG.sheets.helper1 + '" not found!');
-    return;
-  }
-  if (!destinationSheet) {
-    console.error('Error: Destination sheet "' + CONFIG.sheets.helper2 + '" not found!');
-    return;
+    throw new Error('The sheet "' + CONFIG.sheets.helper2 + '" was not found. Please check the name and try again.');
   }
 
-  // Get all the data from the source sheet
-  var data = sourceSheet.getDataRange().getValues();
+  const sourceData = sourceSheet.getDataRange().getValues();
+  const sourceHeaders = sourceData.shift();
+
+  const selectedColumnIndex = sourceHeaders.indexOf("Selected");
+  if (selectedColumnIndex === -1) {
+    throw new Error('A column named "Selected" was not found in "' + CONFIG.sheets.helper2 + '".');
+  }
+
+  const selectedRows = sourceData.filter(row => row[selectedColumnIndex] === true);
+
+  processAndWriteData(ss, sourceHeaders, selectedRows, CONFIG.sheets.report, false);
+  processAndWriteData(ss, sourceHeaders, selectedRows, CONFIG.sheets.reportNotes, true);
+}
+
+function processAndWriteData(ss, sourceHeaders, selectedRows, destinationSheetName, includeAllColumns) {
+  const destinationSheet = ss.getSheetByName(destinationSheetName);
+  if (!destinationSheet) {
+    throw new Error(`The destination sheet "${destinationSheetName}" was not found.`);
+  }
+
+  let columnMapping = [
+    { source: "Event Date", destination: "Date" },
+    { source: "Event Time", destination: "Time" },
+    { source: "Building", destination: "Building" },
+    { source: "Areas", destination: "Areas" },
+    { source: "Name", destination: "Name" },
+    { source: "ID", destination: "ID" },
+    { source: "Door Times", destination: "Door Times" },
+    { source: "Status", destination: "Status" },
+    { source: "Notes", destination: "Notes" }
+  ];
   
-  // The first row contains the headers
-  var headers = data.shift(); 
+  if (!includeAllColumns) {
+    columnMapping = columnMapping.filter(mapping => mapping.source !== "Notes" && mapping.source !== "Areas" && mapping.source !== "Status");
+  }
+
+  const sourceColumnIndices = columnMapping.map(mapping => {
+    const index = sourceHeaders.indexOf(mapping.source);
+    if (index === -1) {
+      throw new Error(`Column "${mapping.source}" not found in "` + CONFIG.sheets.helper2 + `".`);
+    }
+    return index;
+  });
+
+  const outputData = selectedRows.map(row => {
+    return sourceColumnIndices.map(index => row[index]);
+  });
+
+  const destinationHeaders = columnMapping.map(mapping => mapping.destination);
+
+  destinationSheet.clear();
+  destinationSheet.getRange(1, 1, 1, destinationHeaders.length).setValues([destinationHeaders]);
+
+  if (outputData.length > 0) {
+    destinationSheet.getRange(2, 1, outputData.length, outputData[0].length).setValues(outputData);
+  }
   
-  // --- Step 1: Filter Rows based on Status ---
-  var statusColIndex = headers.indexOf('Status');
-  if (statusColIndex === -1) {
-    console.error('Error: "Status" column could not be found in the source sheet "' + CONFIG.sheets.helper1 + '".');
+  PrintPageFormattingandTrim(destinationSheetName);
+}
+
+function PrintPageFormattingandTrim(sheetName) {
+  PrintPageFormattingONLY(sheetName);
+  trimSheet(sheetName);
+}
+
+function PrintPageFormattingONLY(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet) {
+    throw new Error(`The sheet "${sheetName}" was not found for formatting.`);
+  }
+  
+  if (sheet.getLastRow() === 0) {
+      return;
+  }
+
+  const range = sheet.getDataRange();
+  
+  if (range.getNumRows() <= 1) {
+    if (range.getNumRows() === 1) {
+      range.setFontColor("#000000");
+      sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7");
+    }
+    range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
     return; 
   }
-  var excludedStatuses = ["Declined", "Canceled", "Deleted", "Bulk Declined", "Bulk Canceled", "Bulk Deleted"];
-  var filteredRows = data.filter(function(row) {
-    var status = row[statusColIndex]; 
-    return !excludedStatuses.includes(status);
-  });
   
-  // --- Step 2: Filter Columns to remove "Combined Door Times" ---
-  var columnsToRemove = [];
-  headers.forEach(function(header, index) {
-    if (header.includes("Combined Door Times")) {
-      columnsToRemove.push(index);
-    }
-  });
-  var newHeaders = headers.filter(function(_, index) {
-    return !columnsToRemove.includes(index);
-  });
-  var processedData = filteredRows.map(function(row) {
-    return row.filter(function(_, index) {
-      return !columnsToRemove.includes(index);
-    });
-  });
-
-  // --- Calculate the date range for auto-selection ---
-  var targetDate = calculateTargetDate();
-  targetDate.setHours(0, 0, 0, 0); // Normalize to compare dates only
-
-  // --- Step 3: Add "Selected" column data based on Target Date & Door Times ---
-  var eventDateColIndex_forSelect = newHeaders.indexOf('Event Date');
-  var doorTimesColIndex_forSelect = newHeaders.indexOf('Door Times'); // Get Door Times index
-  newHeaders.unshift("Selected"); // Add header for the new column
-
-  processedData.forEach(function(row) {
-    var shouldBeChecked = false;
-
-    // Condition 1: Check if the date is in range
-    var isDateInRange = false;
-    if (eventDateColIndex_forSelect !== -1) {
-      var eventDate = parseDate(row[eventDateColIndex_forSelect]);
-      if (eventDate) {
-        eventDate.setHours(0, 0, 0, 0);
-        if (eventDate <= targetDate) {
-          isDateInRange = true;
-        }
-      }
-    }
-
-    // Condition 2: Check if "Door Times" has data
-    var hasDoorTimes = false;
-    if (doorTimesColIndex_forSelect !== -1) {
-      var doorTimesData = row[doorTimesColIndex_forSelect];
-      if (doorTimesData && doorTimesData.toString().trim() !== '') {
-        hasDoorTimes = true;
-      }
-    }
-
-    // A row is only selected if BOTH conditions are true
-    if (isDateInRange && hasDoorTimes) {
-      shouldBeChecked = true;
-    }
-
-    row.unshift(shouldBeChecked);
-  });
-
-
-  // --- Step 4: Remove Duplicates ---
-  var uniqueData = [];
-  var seenRows = {};
-  var idColIndex = newHeaders.indexOf('ID');
-  var areasColIndex = newHeaders.indexOf('Areas');
-  processedData.forEach(function(row) {
-    var rowKey = row.filter(function(cell, index) {
-      return index !== 0 && index !== idColIndex && index !== areasColIndex;
-    }).join('|');
-    if (!seenRows[rowKey]) {
-      seenRows[rowKey] = true;
-      uniqueData.push(row);
-    }
-  });
-
-  // --- Step 5: Sort Data ---
-  var eventDateColIndex = newHeaders.indexOf('Event Date');
-  var buildingColIndex = newHeaders.indexOf('Building');
-  var eventTimeColIndex = newHeaders.indexOf('Event Time');
-  var statusColIndex_forSort = newHeaders.indexOf('Status');
-  var doorTimesColIndex_forSort = newHeaders.indexOf('Door Times');
-  var selectedColIndex = 0; // "Selected" is always the first column
-
-  uniqueData.sort(function(a, b) {
-    // --- Priority 1: "Selected" Checkbox ---
-    var aIsSelected = a[selectedColIndex] === true;
-    var bIsSelected = b[selectedColIndex] === true;
-
-    if (aIsSelected && !bIsSelected) {
-      return -1; // 'a' comes first
-    }
-    if (!aIsSelected && bIsSelected) {
-      return 1; // 'b' comes first
-    }
-
-    // --- Priority 2: For UNSELECTED rows, sort by "Door Times" presence ---
-    if (!aIsSelected && !bIsSelected) {
-      var aHasDoorTimes = a[doorTimesColIndex_forSort] && a[doorTimesColIndex_forSort].toString().trim() !== '';
-      var bHasDoorTimes = b[doorTimesColIndex_forSort] && b[doorTimesColIndex_forSort].toString().trim() !== '';
-      if (aHasDoorTimes && !bHasDoorTimes) {
-        return -1; // 'a' comes first
-      }
-      if (!aHasDoorTimes && bHasDoorTimes) {
-        return 1; // 'b' comes first
-      }
-    }
-
-    // --- Priority 3: "Pending Approval" Status (Case-Insensitive) ---
-    var statusA = (a[statusColIndex_forSort] || '').toUpperCase();
-    var statusB = (b[statusColIndex_forSort] || '').toUpperCase();
-    var aIsPending = statusA.includes("PENDING") && statusA.includes("APPROVAL");
-    var bIsPending = statusB.includes("PENDING") && statusB.includes("APPROVAL");
-
-    if (aIsPending && !bIsPending) {
-      return -1; // 'a' comes first
-    }
-    if (!aIsPending && bIsPending) {
-      return 1; // 'b' comes first
-    }
-    
-    // --- Priority 4: Fallback to Original Sorting Logic ---
-    var dateA = parseDate(a[eventDateColIndex]);
-    var dateB = parseDate(b[eventDateColIndex]);
-    if (dateA && !dateB) return -1;
-    if (!dateA && dateB) return 1;
-    if (dateA && dateB && (dateA.getTime() !== dateB.getTime())) {
-      return dateA.getTime() - dateB.getTime();
-    }
-    
-    var buildingA = a[buildingColIndex] || '';
-    var buildingB = b[buildingColIndex] || '';
-    var buildingCompare = buildingA.localeCompare(buildingB);
-    if (buildingCompare !== 0) return buildingCompare;
-    
-    var timeA = parseTime(a[eventTimeColIndex]);
-    var timeB = parseTime(b[eventTimeColIndex]);
-    if (timeA && !timeB) return -1;
-    if (!timeA && timeB) return 1;
-    if (!timeA && !timeB) return 0;
-    return timeA.getTime() - timeB.getTime();
-  });
-
-  // --- Step 5.5: Uncheck Pending Approval Rows ---
-  // This step runs after sorting to ensure "Pending" events are at the top but unchecked.
-  uniqueData.forEach(function(row) {
-    var status = (row[statusColIndex_forSort] || '').toUpperCase();
-    var isPending = status.includes("PENDING") && status.includes("APPROVAL");
-    
-    if (isPending) {
-      row[selectedColIndex] = false; // Uncheck the box
-    }
-  });
-
-  // --- Step 6: Write data and call formatter ---
-  var finalData = [newHeaders].concat(uniqueData);
-  destinationSheet.clear();
+  const dataToSort = range.offset(1, 0, range.getNumRows() - 1);
+  dataToSort.sort([
+    { column: 1, ascending: true },
+    { column: 3, ascending: true },
+    { column: 2, ascending: true }
+  ]);
   
-  if (finalData.length > 1) { // Check if there is at least a header and one row of data
-    destinationSheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
-    Stage2_format(destinationSheet, uniqueData.length, newHeaders);
-    console.log('Stage 2 Filtering Complete! Data written and formatted in "' + CONFIG.sheets.helper2 + '".');
-  } else {
-    // Also format the sheet even if there's no data, to ensure it's clean
-    Stage2_format(destinationSheet, 0, newHeaders);
-    console.log('Stage 2 Filtering Complete! No data was left to write after filtering.');
-  }
-}
-
-/**
- * =======================================================================================
- * --- HELPER FUNCTIONS ---
- * =======================================================================================
- */
-
-/**
- * Helper function to robustly parse date values which could be Date objects or strings.
- */
-function parseDate(dateVal) {
-  if (dateVal instanceof Date) {
-    return dateVal;
-  }
-  if (typeof dateVal === 'string' && dateVal.includes('/')) {
-    var parts = dateVal.split('/');
-    // Assuming MM/DD format, and we need to add a year for a valid Date object.
-    // The year doesn't matter for sorting within the same year.
-    var currentYear = new Date().getFullYear();
-    // To handle year-end rollovers, check if the date is in the past (e.g., it's Jan and date is Dec)
-    var date = new Date(currentYear, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
-    if (date < new Date() && new Date().getMonth() - date.getMonth() > 6) { // Heuristic for year rollover
-        date.setFullYear(currentYear + 1);
+  range.setFontColor("#000000");
+  sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7");
+  
+  const dataRange = sheet.getRange(2, 1, range.getNumRows() - 1, range.getNumColumns());
+  const backgrounds = [];
+  for (let i = 0; i < dataRange.getNumRows(); i++) {
+    if (i % 2 === 0) {
+      backgrounds.push(new Array(dataRange.getNumColumns()).fill("#ffffff"));
+    } else {
+      backgrounds.push(new Array(dataRange.getNumColumns()).fill("#d9d9d9"));
     }
-    return date;
   }
-  return null;
-}
+  dataRange.setBackgrounds(backgrounds);
 
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const numDataRows = range.getNumRows() - 1;
 
-/**
- * Helper function to parse 'h:mm am/pm' into a comparable Date object.
- */
-function parseTime(timeStr) {
-  if (!timeStr || typeof timeStr !== 'string') {
-    return null;
+  const dateIndex = headers.indexOf("Date") + 1;
+  const timeIndex = headers.indexOf("Time") + 1;
+  const buildingIndex = headers.indexOf("Building") + 1;
+  const idIndex = headers.indexOf("ID") + 1;
+  const statusIndex = headers.indexOf("Status") + 1;
+  const nameIndex = headers.indexOf("Name") + 1;
+  const doorTimesIndex = headers.indexOf("Door Times") + 1;
+  const notesIndex = headers.indexOf("Notes") + 1;
+  const areasIndex = headers.indexOf("Areas") + 1;
+  
+  if (timeIndex > 0) sheet.getRange(2, timeIndex, numDataRows, 1).setFontSize(8);
+  if (idIndex > 0) sheet.getRange(2, idIndex, numDataRows, 1).setFontSize(8);
+  if (areasIndex > 0) sheet.getRange(2, areasIndex, numDataRows, 1).setFontSize(6);
+  if (nameIndex > 0) sheet.getRange(2, nameIndex, numDataRows, 1).setFontSize(6);
+  if (notesIndex > 0) sheet.getRange(2, notesIndex, numDataRows, 1).setFontSize(6);
+  if (statusIndex > 0) sheet.getRange(2, statusIndex, numDataRows, 1).setFontSize(6);
+
+  if (dateIndex > 0) sheet.getRange(2, dateIndex, numDataRows, 1).setHorizontalAlignment("center");
+  if (timeIndex > 0) sheet.getRange(2, timeIndex, numDataRows, 1).setHorizontalAlignment("center");
+  if (buildingIndex > 0) sheet.getRange(2, buildingIndex, numDataRows, 1).setHorizontalAlignment("center");
+  if (idIndex > 0) sheet.getRange(2, idIndex, numDataRows, 1).setHorizontalAlignment("center");
+  if (statusIndex > 0) sheet.getRange(2, statusIndex, numDataRows, 1).setHorizontalAlignment("center");
+  if (nameIndex > 0) sheet.getRange(2, nameIndex, numDataRows, 1).setHorizontalAlignment("left");
+  if (doorTimesIndex > 0) sheet.getRange(2, doorTimesIndex, numDataRows, 1).setHorizontalAlignment("left");
+  if (notesIndex > 0) sheet.getRange(2, notesIndex, numDataRows, 1).setHorizontalAlignment("left");
+
+  if (doorTimesIndex > 0) {
+    sheet.getRange(2, doorTimesIndex, numDataRows, 1).setWrap(true);
   }
-  return new Date('1970/01/01 ' + timeStr.replace(' ', '').toUpperCase());
-}
 
-/**
- * Applies all necessary formatting to the destination sheet. (Version 1.09)
- * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The sheet object to format.
- * @param {number} numDataRows The number of data rows (excluding the header).
- * @param {string[]} headers The array of header strings.
- */
-function Stage2_format(sheet, numDataRows, headers) {
-  var numCols = headers.length;
-  if (numCols === 0) return; // Exit if there are no columns
+  range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
 
-  // Clear any existing conditional formatting rules and filters
-  sheet.clearConditionalFormatRules();
-  var filter = sheet.getFilter();
-  if (filter) {
-    filter.remove();
-  }
+  const dataValues = sheet.getRange(2, 1, numDataRows, sheet.getLastColumn()).getValues();
+  const dateColIndex = headers.indexOf("Date");
+  const buildingColIndex = headers.indexOf("Building");
+  
+  if (dateColIndex !== -1 && buildingColIndex !== -1 && numDataRows > 1) {
+    for (let i = 1; i < dataValues.length; i++) {
+      const currentRow = dataValues[i];
+      const previousRow = dataValues[i-1];
 
-  // 1. Make the header row bold
-  sheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
-
-  if (numDataRows > 0) {
-    var dataRange = sheet.getRange(2, 1, numDataRows, numCols);
-    var rules = [];
-    var statusColIndex = headers.indexOf('Status');
-    
-    // --- Set Default font color for "Notes" column ---
-    var notesColIndex = headers.indexOf('Notes');
-    if (notesColIndex !== -1) {
-      var notesColumnRange = sheet.getRange(2, notesColIndex + 1, numDataRows, 1);
-      notesColumnRange.setFontColor("#b7b7b7"); // "Dark gray 1"
-    }
-
-    if (statusColIndex !== -1) {
-      var statusColumnLetter = String.fromCharCode('A'.charCodeAt(0) + statusColIndex);
-      var statusColumnRange = sheet.getRange(2, statusColIndex + 1, numDataRows, 1);
+      const currentDate = new Date(currentRow[dateColIndex]);
+      const previousDate = new Date(previousRow[dateColIndex]);
       
-      // --- Rule (Admin Override): "Admin"+"Pending"+"Approval" status cells when A is FALSE ---
-      // Rule - (rule_admin_approval_false)
-      var rule_admin_approval_false = SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(`=AND($A2=FALSE, ISNUMBER(SEARCH("Admin", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#d9ead3")   // "Light Green 3"
-        .setFontColor("#b7b7b7")   // "Dark gray 1"
-        .setRanges([statusColumnRange])
-        .build();
-      rules.push(rule_admin_approval_false);
+      const currentBuilding = currentRow[buildingColIndex];
+      const previousBuilding = previousRow[buildingColIndex];
 
-      // --- Rule 1: Override for "Pending Approval" status cells when A is FALSE ---
-      // Rule - (rule_pending_approval_false)
-      var rule_pending_approval_false = SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(`=AND($A2=FALSE, ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#fff2cc")   // "Light Yellow 3"
-        .setFontColor("#b7b7b7")   // "Dark gray 1"
-        .setRanges([statusColumnRange])
-        .build();
-      rules.push(rule_pending_approval_false);
-      
-      // --- Rule (Admin TRUE Override): "Admin"+"Pending"+"Approval" rows when A is TRUE ---
-      // Rule - (rule_admin_approval_true)
-      var rule_admin_approval_true = SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(`=AND($A2=TRUE, ISNUMBER(SEARCH("Admin", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#b6d7a8") // "Light Green 1"
-        .setFontColor("#000000") // Black
-        .setRanges([dataRange])
-        .build();
-      rules.push(rule_admin_approval_true);
-
-      // --- Rule 2: Formatting for "Pending Approval" rows when A is TRUE ---
-      // Rule - (rule_pending_approval_true)
-      var rule_pending_approval_true = SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(`=AND($A2=TRUE, ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#ffd966")   // "Light Yellow 1"
-        .setFontColor("#000000")   // Black
-        .setRanges([dataRange])
-        .build();
-      rules.push(rule_pending_approval_true);
+      if (currentDate.setHours(0,0,0,0) !== previousDate.setHours(0,0,0,0)) {
+        sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBorder(true, null, null, null, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID);
+      } else if (currentBuilding !== previousBuilding) {
+        sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBorder(true, null, null, null, false, false, "#000000", SpreadsheetApp.BorderStyle.DASHED);
+      }
     }
-
-    // --- Rule 3: Default formatting for all unchecked rows (A is False) ---
-    // Rule - (rule_A_is_false)
-    var rule_A_is_false = SpreadsheetApp.newConditionalFormatRule()
-      .whenFormulaSatisfied("=$A2=FALSE")
-      .setBackground("#efefef")   // "Light gray 2"
-      .setFontColor("#b7b7b7")   // "Dark gray 1"
-      .setRanges([dataRange])
-      .build();
-    rules.push(rule_A_is_false);
-
-    // Set all new rules to the sheet
-    sheet.setConditionalFormatRules(rules);
-
-    // Add checkboxes to the first column
-    var checkboxRange = sheet.getRange(2, 1, numDataRows, 1);
-    var checkboxRule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
-    checkboxRange.setDataValidation(checkboxRule);
-  }
-  
-  // Add a filter to the data range (including header)
-  sheet.getRange(1, 1, numDataRows + 1, numCols).createFilter();
-
-  // Trim extra rows from the bottom of the sheet
-  var totalRows = numDataRows + 1; // +1 for the header
-  var maxRows = sheet.getMaxRows();
-  if (maxRows > totalRows) {
-    sheet.deleteRows(totalRows + 1, maxRows - totalRows);
   }
 }
 
-/**
- * Calculates a target date based on the current day of the week.
- * If today is Friday, it finds the next Tuesday.
- * Otherwise, it finds the next Friday.
- */
-function calculateTargetDate() {
-  var today = new Date();
-  var dayOfWeek = today.getDay(); // Sunday=0, Monday=1, ..., Friday=5, Saturday=6
-  var targetDate = new Date(today); // Create a copy to modify
+function trimSheet(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
 
-  if (dayOfWeek === 5) { // If it's Friday
-    // Add 4 days to get to the next Tuesday
-    targetDate.setDate(today.getDate() + 4);
-  } else { // For any other day
-    // Calculate days needed to get to the next Friday
-    var daysUntilFriday = (5 - dayOfWeek + 7) % 7;
-    // If today is Saturday, daysUntilFriday will be 6. If Sunday, 5, etc.
-    // If today is before Friday (e.g. Wed), this will be 2.
-    if (daysUntilFriday === 0) daysUntilFriday = 7; // If today is Friday, get next Friday
-    targetDate.setDate(today.getDate() + daysUntilFriday);
+  if (!sheet) {
+    throw new Error(`The sheet "${sheetName}" was not found for trimming.`);
+  }
+
+  if (sheet.getLastRow() === 0) {
+      return;
   }
   
-  Logger.log('Calculated Target Date: ' + targetDate);
-  return targetDate;
+  const lastRow = sheet.getLastRow();
+  const lastCol = sheet.getLastColumn();
+  const maxRows = sheet.getMaxRows();
+  const maxCols = sheet.getMaxColumns();
+
+  if (maxRows > lastRow) {
+    sheet.deleteRows(lastRow + 1, maxRows - lastRow);
+  }
+  if (maxCols > lastCol) {
+    sheet.deleteColumns(lastCol + 1, maxCols - lastCol);
+  }
 }
 
