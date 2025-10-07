@@ -1,12 +1,16 @@
-// Stage3.gs (Stage 3 - Copy, Format, and Trim for Reporting)
+// Project Name: Door Report Full
+// Project Version: 3.0
+// Filename: Stage3.gs
+// File Version: 3.01
+
 // This script generates two reports ("AutoReport" and "AutoReport w/Notes") from Output-Helper2, applying formatting and trimming.
 
 function copySelectedDataToAutoReport() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sourceSheet = ss.getSheetByName("Output-Helper2");
+  const sourceSheet = ss.getSheetByName(CONFIG.sheets.helper2);
 
   if (!sourceSheet) {
-    throw new Error('The sheet "Output-Helper2" was not found. Please check the name and try again.');
+    throw new Error('The sheet "' + CONFIG.sheets.helper2 + '" was not found. Please check the name and try again.');
   }
 
   const sourceData = sourceSheet.getDataRange().getValues();
@@ -14,7 +18,7 @@ function copySelectedDataToAutoReport() {
 
   const selectedColumnIndex = sourceHeaders.indexOf("Selected");
   if (selectedColumnIndex === -1) {
-    throw new Error('A column named "Selected" was not found in "Output-Helper2".');
+    throw new Error('A column named "Selected" was not found in "' + CONFIG.sheets.helper2 + '".');
   }
 
   const selectedRows = sourceData.filter(row => row[selectedColumnIndex] === true);
@@ -48,7 +52,7 @@ function processAndWriteData(ss, sourceHeaders, selectedRows, destinationSheetNa
   const sourceColumnIndices = columnMapping.map(mapping => {
     const index = sourceHeaders.indexOf(mapping.source);
     if (index === -1) {
-      throw new Error(`Column "${mapping.source}" not found in "Output-Helper2".`);
+      throw new Error(`Column "${mapping.source}" not found in "` + CONFIG.sheets.helper2 + `".`);
     }
     return index;
   });
@@ -81,94 +85,95 @@ function PrintPageFormattingONLY(sheetName) {
   if (!sheet) {
     throw new Error(`The sheet "${sheetName}" was not found for formatting.`);
   }
-  
+
   if (sheet.getLastRow() === 0) {
-      return;
+    return;
   }
 
   const range = sheet.getDataRange();
-  
+
   if (range.getNumRows() <= 1) {
     if (range.getNumRows() === 1) {
       range.setFontColor("#000000");
-      sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7");
+      sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7").setFontWeight("bold");
     }
     range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
-    return; 
+    return;
   }
-  
+
   const dataToSort = range.offset(1, 0, range.getNumRows() - 1);
   dataToSort.sort([
     { column: 1, ascending: true },
     { column: 3, ascending: true },
     { column: 2, ascending: true }
   ]);
-  
+
   range.setFontColor("#000000");
-  sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7");
-  
+  sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7").setFontWeight("bold");
+
   const dataRange = sheet.getRange(2, 1, range.getNumRows() - 1, range.getNumColumns());
   const backgrounds = [];
   for (let i = 0; i < dataRange.getNumRows(); i++) {
-    if (i % 2 === 0) {
-      backgrounds.push(new Array(dataRange.getNumColumns()).fill("#ffffff"));
-    } else {
-      backgrounds.push(new Array(dataRange.getNumColumns()).fill("#d9d9d9"));
-    }
+    backgrounds.push(new Array(dataRange.getNumColumns()).fill(i % 2 === 0 ? "#ffffff" : "#d9d9d9"));
   }
   dataRange.setBackgrounds(backgrounds);
+
+  // --- New Dynamic Formatting Section ---
+  const formatConfig = {
+    "Date":       { width: 50,  dataFontSize: 10, dataAlign: "center", headerAlign: "center", numberFormat: "m/d",          wrap: false },
+    "Time":       { width: 50,  dataFontSize: 8,  dataAlign: "center", headerAlign: "center", numberFormat: "h:mm am/pm",   wrap: false },
+    "Building":   { width: 60,  dataFontSize: 10, dataAlign: "center", headerAlign: "center", numberFormat: null,           wrap: false },
+    "Name":       { width: 100, dataFontSize: 6,  dataAlign: "left",   headerAlign: "center", numberFormat: null,           wrap: true  },
+    "ID":         { width: 50,  dataFontSize: 8,  dataAlign: "center", headerAlign: "center", numberFormat: null,           wrap: false },
+    "Door Times": { width: 350, dataFontSize: 10, dataAlign: "left",   headerAlign: "left",   numberFormat: null,           wrap: true  },
+    "Notes":      { width: 500, dataFontSize: 6,  dataAlign: "left",   headerAlign: "left",   numberFormat: null,           wrap: true  },
+    "Status":     { width: 50,  dataFontSize: 6,  dataAlign: "left",   headerAlign: "center", numberFormat: null,           wrap: true  },
+    "Areas":      { width: 50,  dataFontSize: 6,  dataAlign: "left",   headerAlign: "center", numberFormat: null,           wrap: true  }
+  };
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const numDataRows = range.getNumRows() - 1;
 
-  const dateIndex = headers.indexOf("Date") + 1;
-  const timeIndex = headers.indexOf("Time") + 1;
-  const buildingIndex = headers.indexOf("Building") + 1;
-  const idIndex = headers.indexOf("ID") + 1;
-  const statusIndex = headers.indexOf("Status") + 1;
-  const nameIndex = headers.indexOf("Name") + 1;
-  const doorTimesIndex = headers.indexOf("Door Times") + 1;
-  const notesIndex = headers.indexOf("Notes") + 1;
-  const areasIndex = headers.indexOf("Areas") + 1;
+  headers.forEach((header, i) => {
+    const colIndex = i + 1;
+    const config = formatConfig[header];
+    if (config) {
+      sheet.setColumnWidth(colIndex, config.width);
+      
+      const headerRange = sheet.getRange(1, colIndex);
+      headerRange.setFontSize(10).setHorizontalAlignment(config.headerAlign);
+
+      if (numDataRows > 0) {
+        const dataColRange = sheet.getRange(2, colIndex, numDataRows);
+        dataColRange.setFontSize(config.dataFontSize)
+                    .setHorizontalAlignment(config.dataAlign)
+                    .setWrap(config.wrap);
+        if (config.numberFormat) {
+          dataColRange.setNumberFormat(config.numberFormat);
+        }
+      }
+    }
+  });
   
-  if (timeIndex > 0) sheet.getRange(2, timeIndex, numDataRows, 1).setFontSize(8);
-  if (idIndex > 0) sheet.getRange(2, idIndex, numDataRows, 1).setFontSize(8);
-  if (areasIndex > 0) sheet.getRange(2, areasIndex, numDataRows, 1).setFontSize(6);
-  if (nameIndex > 0) sheet.getRange(2, nameIndex, numDataRows, 1).setFontSize(6);
-  if (notesIndex > 0) sheet.getRange(2, notesIndex, numDataRows, 1).setFontSize(6);
-  if (statusIndex > 0) sheet.getRange(2, statusIndex, numDataRows, 1).setFontSize(6);
-
-  if (dateIndex > 0) sheet.getRange(2, dateIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (timeIndex > 0) sheet.getRange(2, timeIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (buildingIndex > 0) sheet.getRange(2, buildingIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (idIndex > 0) sheet.getRange(2, idIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (statusIndex > 0) sheet.getRange(2, statusIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (nameIndex > 0) sheet.getRange(2, nameIndex, numDataRows, 1).setHorizontalAlignment("left");
-  if (doorTimesIndex > 0) sheet.getRange(2, doorTimesIndex, numDataRows, 1).setHorizontalAlignment("left");
-  if (notesIndex > 0) sheet.getRange(2, notesIndex, numDataRows, 1).setHorizontalAlignment("left");
-
-  if (doorTimesIndex > 0) {
-    sheet.getRange(2, doorTimesIndex, numDataRows, 1).setWrap(true);
-  }
+  range.setVerticalAlignment("middle");
+  // --- End of New Section ---
 
   range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
 
   const dataValues = sheet.getRange(2, 1, numDataRows, sheet.getLastColumn()).getValues();
   const dateColIndex = headers.indexOf("Date");
   const buildingColIndex = headers.indexOf("Building");
-  
+
   if (dateColIndex !== -1 && buildingColIndex !== -1 && numDataRows > 1) {
     for (let i = 1; i < dataValues.length; i++) {
       const currentRow = dataValues[i];
-      const previousRow = dataValues[i-1];
-
+      const previousRow = dataValues[i - 1];
       const currentDate = new Date(currentRow[dateColIndex]);
       const previousDate = new Date(previousRow[dateColIndex]);
-      
       const currentBuilding = currentRow[buildingColIndex];
       const previousBuilding = previousRow[buildingColIndex];
 
-      if (currentDate.setHours(0,0,0,0) !== previousDate.setHours(0,0,0,0)) {
+      if (currentDate.setHours(0, 0, 0, 0) !== previousDate.setHours(0, 0, 0, 0)) {
         sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBorder(true, null, null, null, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID);
       } else if (currentBuilding !== previousBuilding) {
         sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBorder(true, null, null, null, false, false, "#000000", SpreadsheetApp.BorderStyle.DASHED);
@@ -176,6 +181,7 @@ function PrintPageFormattingONLY(sheetName) {
     }
   }
 }
+
 
 function trimSheet(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
