@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
-// Project Version: 2.0
+// Project Version: 3.0
 // Filename: Door Report ALL.gs
-// File Version: 2.01
+// File Version: 3.01
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -737,10 +737,7 @@ function parseDate(dateVal) {
   }
   if (typeof dateVal === 'string' && dateVal.includes('/')) {
     var parts = dateVal.split('/');
-    // Assuming MM/DD format, and we need to add a year for a valid Date object.
-    // The year doesn't matter for sorting within the same year.
     var currentYear = new Date().getFullYear();
-    // To handle year-end rollovers, check if the date is in the past (e.g., it's Jan and date is Dec)
     var date = new Date(currentYear, parseInt(parts[0], 10) - 1, parseInt(parts[1], 10));
     if (date < new Date() && new Date().getMonth() - date.getMonth() > 6) { // Heuristic for year rollover
         date.setFullYear(currentYear + 1);
@@ -762,106 +759,102 @@ function parseTime(timeStr) {
 }
 
 /**
- * Applies all necessary formatting to the destination sheet. (Version 1.09)
+ * Applies all necessary formatting to the destination sheet.
  * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet The sheet object to format.
  * @param {number} numDataRows The number of data rows (excluding the header).
  * @param {string[]} headers The array of header strings.
  */
 function Stage2_format(sheet, numDataRows, headers) {
   var numCols = headers.length;
-  if (numCols === 0) return; // Exit if there are no columns
+  if (numCols === 0) return;
 
-  // Clear any existing conditional formatting rules and filters
   sheet.clearConditionalFormatRules();
   var filter = sheet.getFilter();
   if (filter) {
     filter.remove();
   }
 
-  // 1. Make the header row bold
   sheet.getRange(1, 1, 1, numCols).setFontWeight("bold");
 
+  // --- BEGIN JSON-Based Formatting ---
+  const formattingInfo = {
+    widths: [61, 40, 55, 62, 160, 143, 58, 112, 350, 729],
+    fontSizes: [10, 10, 8, 10, 8, 10, 10, 8, 10, 8],
+    horizontalAlignments: ["center", "center", "center", "center", "left", "left", "left", "left", "left", "left"],
+    verticalAlignments: ["middle", "middle", "middle", "middle", "middle", "middle", "middle", "middle", "middle", "bottom"],
+    textWraps: [true, true, true, true, true, true, true, true, true, true]
+  };
+
+  for (let i = 0; i < formattingInfo.widths.length && i < numCols; i++) {
+    sheet.setColumnWidth(i + 1, formattingInfo.widths[i]);
+  }
+
   if (numDataRows > 0) {
+    for (let i = 0; i < numCols; i++) {
+      const colRange = sheet.getRange(2, i + 1, numDataRows, 1);
+      if (formattingInfo.fontSizes[i]) colRange.setFontSize(formattingInfo.fontSizes[i]);
+      if (formattingInfo.horizontalAlignments[i]) colRange.setHorizontalAlignment(formattingInfo.horizontalAlignments[i]);
+      if (formattingInfo.verticalAlignments[i]) colRange.setVerticalAlignment(formattingInfo.verticalAlignments[i]);
+      if (formattingInfo.textWraps[i] !== undefined) colRange.setWrap(formattingInfo.textWraps[i]);
+    }
+
+    const eventDateColIndex = headers.indexOf('Event Date');
+    if (eventDateColIndex !== -1) {
+      sheet.getRange(2, eventDateColIndex + 1, numDataRows, 1).setNumberFormat('mm/dd');
+    }
+
+    const eventTimeColIndex = headers.indexOf('Event Time');
+    if (eventTimeColIndex !== -1) {
+      sheet.getRange(2, eventTimeColIndex + 1, numDataRows, 1).setNumberFormat('h:mm am/pm');
+    }
+
     var dataRange = sheet.getRange(2, 1, numDataRows, numCols);
     var rules = [];
     var statusColIndex = headers.indexOf('Status');
     
-    // --- Set Default font color for "Notes" column ---
     var notesColIndex = headers.indexOf('Notes');
     if (notesColIndex !== -1) {
-      var notesColumnRange = sheet.getRange(2, notesColIndex + 1, numDataRows, 1);
-      notesColumnRange.setFontColor("#b7b7b7"); // "Dark gray 1"
+      sheet.getRange(2, notesColIndex + 1, numDataRows, 1).setFontColor("#b7b7b7");
     }
 
     if (statusColIndex !== -1) {
       var statusColumnLetter = String.fromCharCode('A'.charCodeAt(0) + statusColIndex);
       var statusColumnRange = sheet.getRange(2, statusColIndex + 1, numDataRows, 1);
       
-      // --- Rule (Admin Override): "Admin"+"Pending"+"Approval" status cells when A is FALSE ---
-      // Rule - (rule_admin_approval_false)
       var rule_admin_approval_false = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied(`=AND($A2=FALSE, ISNUMBER(SEARCH("Admin", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#d9ead3")   // "Light Green 3"
-        .setFontColor("#b7b7b7")   // "Dark gray 1"
-        .setRanges([statusColumnRange])
-        .build();
+        .setBackground("#d9ead3").setFontColor("#b7b7b7").setRanges([statusColumnRange]).build();
       rules.push(rule_admin_approval_false);
 
-      // --- Rule 1: Override for "Pending Approval" status cells when A is FALSE ---
-      // Rule - (rule_pending_approval_false)
       var rule_pending_approval_false = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied(`=AND($A2=FALSE, ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#fff2cc")   // "Light Yellow 3"
-        .setFontColor("#b7b7b7")   // "Dark gray 1"
-        .setRanges([statusColumnRange])
-        .build();
+        .setBackground("#fff2cc").setFontColor("#b7b7b7").setRanges([statusColumnRange]).build();
       rules.push(rule_pending_approval_false);
       
-      // --- Rule (Admin TRUE Override): "Admin"+"Pending"+"Approval" rows when A is TRUE ---
-      // Rule - (rule_admin_approval_true)
       var rule_admin_approval_true = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied(`=AND($A2=TRUE, ISNUMBER(SEARCH("Admin", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#b6d7a8") // "Light Green 1"
-        .setFontColor("#000000") // Black
-        .setRanges([dataRange])
-        .build();
+        .setBackground("#b6d7a8").setFontColor("#000000").setRanges([dataRange]).build();
       rules.push(rule_admin_approval_true);
 
-      // --- Rule 2: Formatting for "Pending Approval" rows when A is TRUE ---
-      // Rule - (rule_pending_approval_true)
       var rule_pending_approval_true = SpreadsheetApp.newConditionalFormatRule()
         .whenFormulaSatisfied(`=AND($A2=TRUE, ISNUMBER(SEARCH("Pending", $${statusColumnLetter}2)), ISNUMBER(SEARCH("Approval", $${statusColumnLetter}2)))`)
-        .setBackground("#ffd966")   // "Light Yellow 1"
-        .setFontColor("#000000")   // Black
-        .setRanges([dataRange])
-        .build();
+        .setBackground("#ffd966").setFontColor("#000000").setRanges([dataRange]).build();
       rules.push(rule_pending_approval_true);
     }
 
-    // --- Rule 3: Default formatting for all unchecked rows (A is False) ---
-    // Rule - (rule_A_is_false)
     var rule_A_is_false = SpreadsheetApp.newConditionalFormatRule()
       .whenFormulaSatisfied("=$A2=FALSE")
-      .setBackground("#efefef")   // "Light gray 2"
-      .setFontColor("#b7b7b7")   // "Dark gray 1"
-      .setRanges([dataRange])
-      .build();
+      .setBackground("#efefef").setFontColor("#b7b7b7").setRanges([dataRange]).build();
     rules.push(rule_A_is_false);
 
-    // Set all new rules to the sheet
     sheet.setConditionalFormatRules(rules);
 
-    // Add checkboxes to the first column
-    var checkboxRange = sheet.getRange(2, 1, numDataRows, 1);
-    var checkboxRule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
-    checkboxRange.setDataValidation(checkboxRule);
+    sheet.getRange(2, 1, numDataRows, 1).setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());
   }
   
-  // Add a filter to the data range (including header)
   sheet.getRange(1, 1, numDataRows + 1, numCols).createFilter();
 
-  // Trim extra rows from the bottom of the sheet
-  var totalRows = numDataRows + 1; // +1 for the header
+  var totalRows = numDataRows + 1;
   var maxRows = sheet.getMaxRows();
   if (maxRows > totalRows) {
     sheet.deleteRows(totalRows + 1, maxRows - totalRows);
@@ -870,23 +863,17 @@ function Stage2_format(sheet, numDataRows, headers) {
 
 /**
  * Calculates a target date based on the current day of the week.
- * If today is Friday, it finds the next Tuesday.
- * Otherwise, it finds the next Friday.
  */
 function calculateTargetDate() {
   var today = new Date();
-  var dayOfWeek = today.getDay(); // Sunday=0, Monday=1, ..., Friday=5, Saturday=6
-  var targetDate = new Date(today); // Create a copy to modify
+  var dayOfWeek = today.getDay();
+  var targetDate = new Date(today);
 
-  if (dayOfWeek === 5) { // If it's Friday
-    // Add 4 days to get to the next Tuesday
-    targetDate.setDate(today.getDate() + 4);
-  } else { // For any other day
-    // Calculate days needed to get to the next Friday
+  if (dayOfWeek === 5) { // Friday
+    targetDate.setDate(today.getDate() + 4); // Next Tuesday
+  } else { // Any other day
     var daysUntilFriday = (5 - dayOfWeek + 7) % 7;
-    // If today is Saturday, daysUntilFriday will be 6. If Sunday, 5, etc.
-    // If today is before Friday (e.g. Wed), this will be 2.
-    if (daysUntilFriday === 0) daysUntilFriday = 7; // If today is Friday, get next Friday
+    if (daysUntilFriday === 0) daysUntilFriday = 7;
     targetDate.setDate(today.getDate() + daysUntilFriday);
   }
   
@@ -985,94 +972,95 @@ function PrintPageFormattingONLY(sheetName) {
   if (!sheet) {
     throw new Error(`The sheet "${sheetName}" was not found for formatting.`);
   }
-  
+
   if (sheet.getLastRow() === 0) {
-      return;
+    return;
   }
 
   const range = sheet.getDataRange();
-  
+
   if (range.getNumRows() <= 1) {
     if (range.getNumRows() === 1) {
       range.setFontColor("#000000");
-      sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7");
+      sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7").setFontWeight("bold");
     }
     range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
-    return; 
+    return;
   }
-  
+
   const dataToSort = range.offset(1, 0, range.getNumRows() - 1);
   dataToSort.sort([
     { column: 1, ascending: true },
     { column: 3, ascending: true },
     { column: 2, ascending: true }
   ]);
-  
+
   range.setFontColor("#000000");
-  sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7");
-  
+  sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7").setFontWeight("bold");
+
   const dataRange = sheet.getRange(2, 1, range.getNumRows() - 1, range.getNumColumns());
   const backgrounds = [];
   for (let i = 0; i < dataRange.getNumRows(); i++) {
-    if (i % 2 === 0) {
-      backgrounds.push(new Array(dataRange.getNumColumns()).fill("#ffffff"));
-    } else {
-      backgrounds.push(new Array(dataRange.getNumColumns()).fill("#d9d9d9"));
-    }
+    backgrounds.push(new Array(dataRange.getNumColumns()).fill(i % 2 === 0 ? "#ffffff" : "#d9d9d9"));
   }
   dataRange.setBackgrounds(backgrounds);
+
+  // --- New Dynamic Formatting Section ---
+  const formatConfig = {
+    "Date":       { width: 50,  dataFontSize: 10, dataAlign: "center", headerAlign: "center", numberFormat: "m/d",          wrap: false },
+    "Time":       { width: 50,  dataFontSize: 8,  dataAlign: "center", headerAlign: "center", numberFormat: "h:mm am/pm",   wrap: false },
+    "Building":   { width: 60,  dataFontSize: 10, dataAlign: "center", headerAlign: "center", numberFormat: null,           wrap: false },
+    "Name":       { width: 100, dataFontSize: 6,  dataAlign: "left",   headerAlign: "center", numberFormat: null,           wrap: true  },
+    "ID":         { width: 50,  dataFontSize: 8,  dataAlign: "center", headerAlign: "center", numberFormat: null,           wrap: false },
+    "Door Times": { width: 350, dataFontSize: 10, dataAlign: "left",   headerAlign: "left",   numberFormat: null,           wrap: true  },
+    "Notes":      { width: 500, dataFontSize: 6,  dataAlign: "left",   headerAlign: "left",   numberFormat: null,           wrap: true  },
+    "Status":     { width: 50,  dataFontSize: 6,  dataAlign: "left",   headerAlign: "center", numberFormat: null,           wrap: true  },
+    "Areas":      { width: 50,  dataFontSize: 6,  dataAlign: "left",   headerAlign: "center", numberFormat: null,           wrap: true  }
+  };
 
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
   const numDataRows = range.getNumRows() - 1;
 
-  const dateIndex = headers.indexOf("Date") + 1;
-  const timeIndex = headers.indexOf("Time") + 1;
-  const buildingIndex = headers.indexOf("Building") + 1;
-  const idIndex = headers.indexOf("ID") + 1;
-  const statusIndex = headers.indexOf("Status") + 1;
-  const nameIndex = headers.indexOf("Name") + 1;
-  const doorTimesIndex = headers.indexOf("Door Times") + 1;
-  const notesIndex = headers.indexOf("Notes") + 1;
-  const areasIndex = headers.indexOf("Areas") + 1;
+  headers.forEach((header, i) => {
+    const colIndex = i + 1;
+    const config = formatConfig[header];
+    if (config) {
+      sheet.setColumnWidth(colIndex, config.width);
+      
+      const headerRange = sheet.getRange(1, colIndex);
+      headerRange.setFontSize(10).setHorizontalAlignment(config.headerAlign);
+
+      if (numDataRows > 0) {
+        const dataColRange = sheet.getRange(2, colIndex, numDataRows);
+        dataColRange.setFontSize(config.dataFontSize)
+                    .setHorizontalAlignment(config.dataAlign)
+                    .setWrap(config.wrap);
+        if (config.numberFormat) {
+          dataColRange.setNumberFormat(config.numberFormat);
+        }
+      }
+    }
+  });
   
-  if (timeIndex > 0) sheet.getRange(2, timeIndex, numDataRows, 1).setFontSize(8);
-  if (idIndex > 0) sheet.getRange(2, idIndex, numDataRows, 1).setFontSize(8);
-  if (areasIndex > 0) sheet.getRange(2, areasIndex, numDataRows, 1).setFontSize(6);
-  if (nameIndex > 0) sheet.getRange(2, nameIndex, numDataRows, 1).setFontSize(6);
-  if (notesIndex > 0) sheet.getRange(2, notesIndex, numDataRows, 1).setFontSize(6);
-  if (statusIndex > 0) sheet.getRange(2, statusIndex, numDataRows, 1).setFontSize(6);
-
-  if (dateIndex > 0) sheet.getRange(2, dateIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (timeIndex > 0) sheet.getRange(2, timeIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (buildingIndex > 0) sheet.getRange(2, buildingIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (idIndex > 0) sheet.getRange(2, idIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (statusIndex > 0) sheet.getRange(2, statusIndex, numDataRows, 1).setHorizontalAlignment("center");
-  if (nameIndex > 0) sheet.getRange(2, nameIndex, numDataRows, 1).setHorizontalAlignment("left");
-  if (doorTimesIndex > 0) sheet.getRange(2, doorTimesIndex, numDataRows, 1).setHorizontalAlignment("left");
-  if (notesIndex > 0) sheet.getRange(2, notesIndex, numDataRows, 1).setHorizontalAlignment("left");
-
-  if (doorTimesIndex > 0) {
-    sheet.getRange(2, doorTimesIndex, numDataRows, 1).setWrap(true);
-  }
+  range.setVerticalAlignment("middle");
+  // --- End of New Section ---
 
   range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
 
   const dataValues = sheet.getRange(2, 1, numDataRows, sheet.getLastColumn()).getValues();
   const dateColIndex = headers.indexOf("Date");
   const buildingColIndex = headers.indexOf("Building");
-  
+
   if (dateColIndex !== -1 && buildingColIndex !== -1 && numDataRows > 1) {
     for (let i = 1; i < dataValues.length; i++) {
       const currentRow = dataValues[i];
-      const previousRow = dataValues[i-1];
-
+      const previousRow = dataValues[i - 1];
       const currentDate = new Date(currentRow[dateColIndex]);
       const previousDate = new Date(previousRow[dateColIndex]);
-      
       const currentBuilding = currentRow[buildingColIndex];
       const previousBuilding = previousRow[buildingColIndex];
 
-      if (currentDate.setHours(0,0,0,0) !== previousDate.setHours(0,0,0,0)) {
+      if (currentDate.setHours(0, 0, 0, 0) !== previousDate.setHours(0, 0, 0, 0)) {
         sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBorder(true, null, null, null, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID);
       } else if (currentBuilding !== previousBuilding) {
         sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBorder(true, null, null, null, false, false, "#000000", SpreadsheetApp.BorderStyle.DASHED);
