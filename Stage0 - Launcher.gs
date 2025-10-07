@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
-// Project Version: 2.0
+// Project Version: 3.0
 // Filename: Stage0 - Launcher.gs
-// File Version: 2.01
+// File Version: 3.01
 
 const CONFIG = {
   sheets: {
@@ -33,7 +33,9 @@ function onOpen() {
       .addSeparator()
       .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
           .addItem('Import Standard (7 days)', 'ImportStandard')
-          .addItem('Import Alt (14 days)', 'ImportAlt'))
+          .addItem('Import Alt (14 days)', 'ImportAlt')
+          .addItem('Testing1', 'Testing1')
+          .addItem('Testing2', 'Testing2'))
       .addToUi();
 }
 
@@ -88,5 +90,13 @@ function Stage2(){
 
 function Stage3(){
   copySelectedDataToAutoReport();
+}
+
+function Testing1(){
+  PrintFormatTesting();
+}
+
+function Testing2(){
+  
 }
 
