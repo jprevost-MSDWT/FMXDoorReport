@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
-// Project Version: 2.0
+// Project Version: 3.0
 // Filename: Stage1.gs
-// File Version: 2.01
+// File Version: 3.01
 
 // This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes duplicates, and sorts.
 
