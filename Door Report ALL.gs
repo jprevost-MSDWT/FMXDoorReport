@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
-// Project Version: 4.0
+// Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 4.00
+// File Version: 5.00
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -20,6 +20,36 @@ const CONFIG = {
   reportRanges: {
     standard: 7,
     alt: 14
+  },
+  columnNames: {
+    eventTime: ["Event time", "Starts"],
+    name: ["Name"],
+    buildings: ["Buildings", "Building"],
+    status: ["Status"],
+    resources: ["Resources"],
+    eventDetails: ["Event Details"],
+    doorNotes: ["Old ML Door Notes"],
+    unlockTime1: ["Unlock Time"],
+    lockTime1: ["Lock Time"],
+    unlockTime2: ["Unlock Time."],
+    lockTime2: ["Lock Time."],
+    unlockTime3: ["Unlock Time.."],
+    lockTime3: ["Lock Time.."],
+    unlockTime4: ["Unlock Time..."],
+    lockTime4: ["Lock Time..."],
+    unlockTime5: ["Unlock Time...."],
+    lockTime5: ["Lock Time...."],
+    unlockTime6: ["Unlock Time....."],
+    lockTime6: ["Lock Time....."],
+    unlockTimeSpecial: ["WCHS Football/Baseball Locker Room Doors Unlock Time"],
+    lockTimeSpecial: ["WCHS Football/Baseball Locker Room Doors Lock Time"],
+    doorSet1: ['Clinic Doors', 'BV Doors', 'CR Doors', 'ECC Doors', 'EA Doors', 'EdCtr Doors', 'GC Doors', 'HA Doors', 'HP Doors', 'LO Doors', 'LP Doors', 'LA Doors', 'MO Doors', 'SH Doors', 'PO Doors', 'SB Doors', 'RP Doors', 'PR Doors', 'REN Doors', 'WCHS Doors', 'Special Doors'],
+    doorSet2: ['EA Doors.', 'BV Doors.', 'CR Doors.', 'ECC Doors.', 'GC Doors.', 'HA Doors.', 'HP Doors.', 'LO Doors.', 'LA Doors.', 'LP Doors.', 'MO Doors.', 'PO Doors.', 'PR Doors.', 'REN Doors.', 'RP Doors.', 'SB Doors.', 'SH Door.', 'WCHS Doors.'],
+    doorSet3: ['WCHS Doors..'],
+    doorSet4: ['WCHS Doors...'],
+    doorSet5: ['WCHS Doors....'],
+    doorSet6: ['WCHS Doors.....'],
+    doorSetSpecial: ['WCHS Football/Baseball Locker Room Doors']
   }
 };
 
@@ -69,16 +99,68 @@ function ReImport(){
 
 // This function remains the same, processing already imported data.
 function ReProcess(){
-  Stage1();
-  Stage2();
-  Stage3();
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    Logger.log('Starting Reprocess...');
+    ss.toast('Starting Reprocess...', 'Status', -1);
+
+    Logger.log('Starting Stage 1...');
+    ss.toast('Starting Stage 1...', 'Status', -1);
+    Stage1();
+    
+    Logger.log('Starting Stage 2...');
+    ss.toast('Starting Stage 2...', 'Status', -1);
+    Stage2();
+    
+    Logger.log('Starting Stage 3...');
+    ss.toast('Starting Stage 3...', 'Status', -1);
+    Stage3();
+    
+    Logger.log('Reprocess Complete!');
+    ss.toast('Reprocess Complete!', 'Status', 5);
+
+  } catch (e) {
+    Logger.log('An error occurred: ' + e.message + '\n' + e.stack);
+    try {
+      const ui = SpreadsheetApp.getUi();
+      ui.alert('An Error Occurred', 'The script encountered a problem: \n\n' + e.message, ui.ButtonSet.OK);
+    } catch (uiError) {
+      throw e;
+    }
+  }
 }
 
 // A new central function to run all processing stages. This will be called from the HTML dialog.
 function ProcessStages() {
-  Stage1();
-  Stage2();
-  Stage3();
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    Logger.log('Starting Process Stages...');
+    ss.toast('Starting Process Stages...', 'Status', -1);
+
+    Logger.log('Starting Stage 1...');
+    ss.toast('Starting Stage 1...', 'Status', -1);
+    Stage1();
+    
+    Logger.log('Starting Stage 2...');
+    ss.toast('Starting Stage 2...', 'Status', -1);
+    Stage2();
+    
+    Logger.log('Starting Stage 3...');
+    ss.toast('Starting Stage 3...', 'Status', -1);
+    Stage3();
+    
+    Logger.log('Process Complete!');
+    ss.toast('Process Complete!', 'Status', 5);
+
+  } catch (e) {
+    Logger.log('An error occurred during processing: ' + e.message + '\n' + e.stack);
+    try {
+      const ui = SpreadsheetApp.getUi();
+      ui.alert('An Error Occurred During Processing', 'The script encountered a problem: \n\n' + e.message, ui.ButtonSet.OK);
+    } catch (uiError) {
+      throw e;
+    }
+  }
 }
 
 function ImportStandard() {
@@ -107,7 +189,8 @@ function Stage3(){
 }
 
 function Testing1(){
-  PrintFormatTesting();
+  // This function is in a separate testing file.
+  // PrintFormatTesting(); 
 }
 
 function Testing2(){
@@ -232,16 +315,13 @@ function FMX_Doors_AutoImport_V8() {
   var dataSheet = ss.getSheetByName(CONFIG.sheets.data);
 
   if (!inputSheet) {
-    console.error('Error: Source sheet "' + CONFIG.sheets.import + '" not found!');
-    return;
+    throw new Error('Source sheet "' + CONFIG.sheets.import + '" not found!');
   }
   if (!outputSheet) {
-    console.error('Error: Destination sheet "' + CONFIG.sheets.helper1 + '" not found!');
-    return;
+    throw new Error('Destination sheet "' + CONFIG.sheets.helper1 + '" not found!');
   }
   if (!dataSheet) {
-    console.error('Error: Lookup sheet "' + CONFIG.sheets.data + '" not found!');
-    return;
+    throw new Error('Lookup sheet "' + CONFIG.sheets.data + '" not found!');
   }
 
   // --- Create a lookup map from the "Data" sheet ---
@@ -272,50 +352,37 @@ function FMX_Doors_AutoImport_V8() {
     ],
   ];
 
-  // --- Find column indexes ---
-  var eventTimeCol = inputHeaders.indexOf("Event time");
-  if (eventTimeCol === -1) {
-    eventTimeCol = inputHeaders.indexOf("Starts");
-  }
-  var nameCol = inputHeaders.indexOf("Name");
-  var buildingsCol = inputHeaders.indexOf("Buildings");
-  if (buildingsCol === -1) {
-    buildingsCol = inputHeaders.indexOf("Building");
-  }
-  var statusCol = inputHeaders.indexOf("Status");
-  var resourcesCol = inputHeaders.indexOf("Resources");
-  var eventDetailsCol = inputHeaders.indexOf("Event Details");
-  var doorNotesCol = inputHeaders.indexOf("Old ML Door Notes");
-  var unlockTimeCol = inputHeaders.indexOf("Unlock Time");
-  var lockTimeCol = inputHeaders.indexOf("Lock Time");
-  var unlockTimeDotCol = inputHeaders.indexOf("Unlock Time.");
-  var lockTimeDotCol = inputHeaders.indexOf("Lock Time.");
-  var unlockTimeDotDotCol = inputHeaders.indexOf("Unlock Time..");
-  var lockTimeDotDotCol = inputHeaders.indexOf("Lock Time..");
-  var unlockTimeDotDotDotCol = inputHeaders.indexOf("Unlock Time...");
-  var lockTimeDotDotDotCol = inputHeaders.indexOf("Lock Time...");
-  var unlockTimeDotDotDotDotCol = inputHeaders.indexOf("Unlock Time....");
-  var lockTimeDotDotDotDotCol = inputHeaders.indexOf("Lock Time....");
-  var lockTimeDotDotDotDotDotCol = inputHeaders.indexOf("Lock Time.....");
-  var unlockTimeDotDotDotDotDotCol = inputHeaders.indexOf("Unlock Time.....");
-  var unlockTimeSpecialCol = inputHeaders.indexOf("WCHS Football/Baseball Locker Room Doors Unlock Time");
-  var lockTimeSpecialCol = inputHeaders.indexOf("WCHS Football/Baseball Locker Room Doors Lock Time");
+  // --- Find column indexes using the new helper function and CONFIG ---
+  var eventTimeCol = getColumnIndex(inputHeaders, 'eventTime');
+  var nameCol = getColumnIndex(inputHeaders, 'name');
+  var buildingsCol = getColumnIndex(inputHeaders, 'buildings');
+  var statusCol = getColumnIndex(inputHeaders, 'status');
+  var resourcesCol = getColumnIndex(inputHeaders, 'resources');
+  var eventDetailsCol = getColumnIndex(inputHeaders, 'eventDetails');
+  var doorNotesCol = getColumnIndex(inputHeaders, 'doorNotes');
+  
+  var unlockTimeCol = getColumnIndex(inputHeaders, 'unlockTime1');
+  var lockTimeCol = getColumnIndex(inputHeaders, 'lockTime1');
+  var unlockTimeDotCol = getColumnIndex(inputHeaders, 'unlockTime2');
+  var lockTimeDotCol = getColumnIndex(inputHeaders, 'lockTime2');
+  var unlockTimeDotDotCol = getColumnIndex(inputHeaders, 'unlockTime3');
+  var lockTimeDotDotCol = getColumnIndex(inputHeaders, 'lockTime3');
+  var unlockTimeDotDotDotCol = getColumnIndex(inputHeaders, 'unlockTime4');
+  var lockTimeDotDotDotCol = getColumnIndex(inputHeaders, 'lockTime4');
+  var unlockTimeDotDotDotDotCol = getColumnIndex(inputHeaders, 'unlockTime5');
+  var lockTimeDotDotDotDotCol = getColumnIndex(inputHeaders, 'lockTime5');
+  var unlockTimeDotDotDotDotDotCol = getColumnIndex(inputHeaders, 'unlockTime6');
+  var lockTimeDotDotDotDotDotCol = getColumnIndex(inputHeaders, 'lockTime6');
+  var unlockTimeSpecialCol = getColumnIndex(inputHeaders, 'unlockTimeSpecial');
+  var lockTimeSpecialCol = getColumnIndex(inputHeaders, 'lockTimeSpecial');
 
-  var doorColumns1 = ['Clinic Doors', 'BV Doors', 'CR Doors', 'ECC Doors', 'EA Doors', 'EdCtr Doors', 'GC Doors', 'HA Doors', 'HP Doors', 'LO Doors', 'LP Doors', 'LA Doors', 'MO Doors', 'SH Doors', 'PO Doors', 'SB Doors', 'RP Doors', 'PR Doors', 'REN Doors', 'WCHS Doors', 'Special Doors'];
-  var doorColumns2 = ['EA Doors.', 'BV Doors.', 'CR Doors.', 'ECC Doors.', 'GC Doors.', 'HA Doors.', 'HP Doors.', 'LO Doors.', 'LA Doors.', 'LP Doors.', 'MO Doors.', 'PO Doors.', 'PR Doors.', 'REN Doors.', 'RP Doors.', 'SB Doors.', 'SH Door.', 'WCHS Doors.'];
-  var doorColumns3 = ['WCHS Doors..'];
-  var doorColumns4 = ['WCHS Doors...'];
-  var doorColumns5 = ['WCHS Doors....'];
-  var doorColumns6 = ['WCHS Doors.....'];
-  var doorColumns7 = ['WCHS Football/Baseball Locker Room Doors'];
-
-  var doorColIndexes1 = getColumnIndexes(inputHeaders, doorColumns1);
-  var doorColIndexes2 = getColumnIndexes(inputHeaders, doorColumns2);
-  var doorColIndexes3 = getColumnIndexes(inputHeaders, doorColumns3);
-  var doorColIndexes4 = getColumnIndexes(inputHeaders, doorColumns4);
-  var doorColIndexes5 = getColumnIndexes(inputHeaders, doorColumns5);
-  var doorColIndexes6 = getColumnIndexes(inputHeaders, doorColumns6);
-  var doorColIndexes7 = getColumnIndexes(inputHeaders, doorColumns7);
+  var doorColIndexes1 = getColumnIndexes(inputHeaders, CONFIG.columnNames.doorSet1);
+  var doorColIndexes2 = getColumnIndexes(inputHeaders, CONFIG.columnNames.doorSet2);
+  var doorColIndexes3 = getColumnIndexes(inputHeaders, CONFIG.columnNames.doorSet3);
+  var doorColIndexes4 = getColumnIndexes(inputHeaders, CONFIG.columnNames.doorSet4);
+  var doorColIndexes5 = getColumnIndexes(inputHeaders, CONFIG.columnNames.doorSet5);
+  var doorColIndexes6 = getColumnIndexes(inputHeaders, CONFIG.columnNames.doorSet6);
+  var doorColIndexes7 = getColumnIndexes(inputHeaders, CONFIG.columnNames.doorSetSpecial);
 
   var seenRows = {};
   var timeZone = ss.getSpreadsheetTimeZone();
@@ -380,37 +447,37 @@ function FMX_Doors_AutoImport_V8() {
       doorNotes = doorNotes.replace(textToRemove1, '').replace(textToRemove2, '').replace(/, Door/g, '\nDoor').trim();
     }
 
-    var doors1 = combineDoorValues(row, doorColumns1, doorColIndexes1);
+    var doors1 = combineDoorValues(row, CONFIG.columnNames.doorSet1, doorColIndexes1);
     var unlockTime1 = formatTimeValue(row[unlockTimeCol], timeZone);
     var lockTime1 = formatTimeValue(row[lockTimeCol], timeZone);
     var combinedTimes1 = formatDoorTimes(doors1, unlockTime1, lockTime1);
 
-    var doors2 = combineDoorValues(row, doorColumns2, doorColIndexes2);
+    var doors2 = combineDoorValues(row, CONFIG.columnNames.doorSet2, doorColIndexes2);
     var unlockTime2 = formatTimeValue(row[unlockTimeDotCol], timeZone);
     var lockTime2 = formatTimeValue(row[lockTimeDotCol], timeZone);
     var combinedTimes2 = formatDoorTimes(doors2, unlockTime2, lockTime2);
 
-    var doors3 = combineDoorValues(row, doorColumns3, doorColIndexes3);
+    var doors3 = combineDoorValues(row, CONFIG.columnNames.doorSet3, doorColIndexes3);
     var unlockTime3 = formatTimeValue(row[unlockTimeDotDotCol], timeZone);
     var lockTime3 = formatTimeValue(row[lockTimeDotDotCol], timeZone);
     var combinedTimes3 = formatDoorTimes(doors3, unlockTime3, lockTime3);
 
-    var doors4 = combineDoorValues(row, doorColumns4, doorColIndexes4);
+    var doors4 = combineDoorValues(row, CONFIG.columnNames.doorSet4, doorColIndexes4);
     var unlockTime4 = formatTimeValue(row[unlockTimeDotDotDotCol], timeZone);
     var lockTime4 = formatTimeValue(row[lockTimeDotDotDotCol], timeZone);
     var combinedTimes4 = formatDoorTimes(doors4, unlockTime4, lockTime4);
 
-    var doors5 = combineDoorValues(row, doorColumns5, doorColIndexes5);
+    var doors5 = combineDoorValues(row, CONFIG.columnNames.doorSet5, doorColIndexes5);
     var unlockTime5 = formatTimeValue(row[unlockTimeDotDotDotDotCol], timeZone);
     var lockTime5 = formatTimeValue(row[lockTimeDotDotDotDotCol], timeZone);
     var combinedTimes5 = formatDoorTimes(doors5, unlockTime5, lockTime5);
 
-    var doors6 = combineDoorValues(row, doorColumns6, doorColIndexes6);
+    var doors6 = combineDoorValues(row, CONFIG.columnNames.doorSet6, doorColIndexes6);
     var unlockTime6 = formatTimeValue(row[unlockTimeDotDotDotDotDotCol], timeZone);
     var lockTime6 = formatTimeValue(row[lockTimeDotDotDotDotDotCol], timeZone);
     var combinedTimes6 = formatDoorTimes(doors6, unlockTime6, lockTime6);
 
-    var doors7 = combineDoorValues(row, doorColumns7, doorColIndexes7);
+    var doors7 = combineDoorValues(row, CONFIG.columnNames.doorSetSpecial, doorColIndexes7);
     var unlockTime7 = formatTimeValue(row[unlockTimeSpecialCol], timeZone);
     var lockTime7 = formatTimeValue(row[lockTimeSpecialCol], timeZone);
     var combinedTimes7 = formatDoorTimes(doors7, unlockTime7, lockTime7);
@@ -444,28 +511,36 @@ function FMX_Doors_AutoImport_V8() {
     }
   }
 
-  try {
-    if (outputData.length > 1) {
-      outputSheet.clear();
-      outputSheet.getRange(1, 1, outputData.length, outputData[0].length).setValues(outputData);
-      var oldFilter = outputSheet.getFilter();
-      if (oldFilter) {
-        oldFilter.remove();
-      }
-      var dataRange = outputSheet.getDataRange();
-      dataRange.createFilter();
-      var rangeToSort = outputSheet.getRange(2, 1, outputSheet.getLastRow() - 1, outputSheet.getLastColumn());
-      rangeToSort.sort([
-        {column: 1, ascending: true},
-        {column: 2, ascending: true}
-      ]);
-      console.log('Script Finished! Please check the "Output-Helper1" sheet.');
-    } else {
-      console.log('Script Finished! No unique data rows found to process.');
+  // No try/catch here; let errors be caught by the parent function (ProcessStages/ReProcess)
+  if (outputData.length > 1) {
+    outputSheet.clear();
+    outputSheet.getRange(1, 1, outputData.length, outputData[0].length).setValues(outputData);
+    var oldFilter = outputSheet.getFilter();
+    if (oldFilter) {
+      oldFilter.remove();
     }
-  } catch (e) {
-    console.error('A critical error occurred while writing to the sheet: ' + e.message);
+    var dataRange = outputSheet.getDataRange();
+    dataRange.createFilter();
+    var rangeToSort = outputSheet.getRange(2, 1, outputSheet.getLastRow() - 1, outputSheet.getLastColumn());
+    rangeToSort.sort([
+      {column: 1, ascending: true},
+      {column: 2, ascending: true}
+    ]);
   }
+}
+
+function getColumnIndex(headers, configKey) {
+  const names = CONFIG.columnNames[configKey];
+  if (!names) {
+    return -1;
+  }
+  for (const name of names) {
+    const index = headers.indexOf(name);
+    if (index !== -1) {
+      return index;
+    }
+  }
+  return -1;
 }
 
 function formatTimeValue(value, timeZone) {
@@ -556,12 +631,10 @@ function stage2_filterProcessedData() {
 
   // Basic error handling to ensure sheets exist
   if (!sourceSheet) {
-    console.error('Error: Source sheet "' + CONFIG.sheets.helper1 + '" not found!');
-    return;
+    throw new Error('Source sheet "' + CONFIG.sheets.helper1 + '" not found!');
   }
   if (!destinationSheet) {
-    console.error('Error: Destination sheet "' + CONFIG.sheets.helper2 + '" not found!');
-    return;
+    throw new Error('Destination sheet "' + CONFIG.sheets.helper2 + '" not found!');
   }
 
   // Get all the data from the source sheet
@@ -573,8 +646,7 @@ function stage2_filterProcessedData() {
   // --- Step 1: Filter Rows based on Status ---
   var statusColIndex = headers.indexOf('Status');
   if (statusColIndex === -1) {
-    console.error('Error: "Status" column could not be found in the source sheet "' + CONFIG.sheets.helper1 + '".');
-    return; 
+    throw new Error('"Status" column could not be found in the source sheet "' + CONFIG.sheets.helper1 + '".');
   }
   var excludedStatuses = ["Declined", "Canceled", "Deleted", "Bulk Declined", "Bulk Canceled", "Bulk Deleted"];
   var filteredRows = data.filter(function(row) {
@@ -740,11 +812,9 @@ function stage2_filterProcessedData() {
   if (finalData.length > 1) { // Check if there is at least a header and one row of data
     destinationSheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
     Stage2_format(destinationSheet, uniqueData.length, newHeaders);
-    console.log('Stage 2 Filtering Complete! Data written and formatted in "' + CONFIG.sheets.helper2 + '".');
   } else {
     // Also format the sheet even if there's no data, to ensure it's clean
     Stage2_format(destinationSheet, 0, newHeaders);
-    console.log('Stage 2 Filtering Complete! No data was left to write after filtering.');
   }
 }
 
@@ -1239,4 +1309,3 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
-

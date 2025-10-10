@@ -1,14 +1,12 @@
 // Project Name: Door Report Full
-// Project Version: 3.0
+// Project Version: 5.0
 // Filename: Stage2.gs
-// File Version: 3.01
+// File Version: 5.00
+// Description: A combined file of all .gs scripts for easy testing.
 
-/**
- * =======================================================================================
- * STAGE 2 - FILTER SCRIPT (Version 3.01)
- * =======================================================================================
- * This script filters data from Stage1, removes duplicates, sorts it, and applies formatting.
- */
+
+//This script filters data from Stage1, removes duplicates, sorts it, and applies formatting.
+ 
 function stage2_filterProcessedData() {
   // Get the active spreadsheet and the relevant sheets
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -17,12 +15,10 @@ function stage2_filterProcessedData() {
 
   // Basic error handling to ensure sheets exist
   if (!sourceSheet) {
-    console.error('Error: Source sheet "' + CONFIG.sheets.helper1 + '" not found!');
-    return;
+    throw new Error('Source sheet "' + CONFIG.sheets.helper1 + '" not found!');
   }
   if (!destinationSheet) {
-    console.error('Error: Destination sheet "' + CONFIG.sheets.helper2 + '" not found!');
-    return;
+    throw new Error('Destination sheet "' + CONFIG.sheets.helper2 + '" not found!');
   }
 
   // Get all the data from the source sheet
@@ -34,8 +30,7 @@ function stage2_filterProcessedData() {
   // --- Step 1: Filter Rows based on Status ---
   var statusColIndex = headers.indexOf('Status');
   if (statusColIndex === -1) {
-    console.error('Error: "Status" column could not be found in the source sheet "' + CONFIG.sheets.helper1 + '".');
-    return; 
+    throw new Error('"Status" column could not be found in the source sheet "' + CONFIG.sheets.helper1 + '".');
   }
   var excludedStatuses = ["Declined", "Canceled", "Deleted", "Bulk Declined", "Bulk Canceled", "Bulk Deleted"];
   var filteredRows = data.filter(function(row) {
@@ -201,11 +196,9 @@ function stage2_filterProcessedData() {
   if (finalData.length > 1) { // Check if there is at least a header and one row of data
     destinationSheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
     Stage2_format(destinationSheet, uniqueData.length, newHeaders);
-    console.log('Stage 2 Filtering Complete! Data written and formatted in "' + CONFIG.sheets.helper2 + '".');
   } else {
     // Also format the sheet even if there's no data, to ensure it's clean
     Stage2_format(destinationSheet, 0, newHeaders);
-    console.log('Stage 2 Filtering Complete! No data was left to write after filtering.');
   }
 }
 

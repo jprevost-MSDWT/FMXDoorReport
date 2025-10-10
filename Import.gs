@@ -1,10 +1,13 @@
-// Project Name: Door Report Full
-// Project Version: 3.0
-// Filename: Stage0 Import.gs
-// File Version: 3.01
 
-function runSecondScript() {
-  showImportDialog();
+// Project Name: Door Report Full
+// Project Version: 5.0
+// Filename: Stage0 Import.gs
+// File Version: 5.00
+// Description: A combined file of all .gs scripts for easy testing.
+
+// This function now receives the shouldProcess flag and passes it to the dialog.
+function runSecondScript(shouldProcess) {
+  showImportDialog(shouldProcess);
 }
 
 function formatDate(date) {
@@ -14,7 +17,8 @@ function formatDate(date) {
   return year + '-' + month + '-' + day;
 }
 
-function ImportReport_Auto(days) {
+// This function now accepts the shouldProcess flag to pass it along the chain.
+function ImportReport_Auto(days, shouldProcess) {
   var today = new Date();
   var futureDate = new Date();
   futureDate.setDate(today.getDate() + days);
@@ -24,12 +28,13 @@ function ImportReport_Auto(days) {
 
   var url = 'https://warrenk12.gofmx.com/scheduling/occurrences?format=csv&useOnlySelectedColumns=False&from=' + fromDate + '&to=' + toDate;
 
+  // The client-side script now calls runSecondScript with the shouldProcess flag.
   const htmlScript = `
     <script>
       window.open('${url}', '_blank');
       google.script.run
         .withSuccessHandler(google.script.host.close)
-        .runSecondScript();
+        .runSecondScript(${shouldProcess});
     </script>
   `;
   const htmlOutput = HtmlService.createHtmlOutput(htmlScript)
@@ -39,8 +44,12 @@ function ImportReport_Auto(days) {
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Opening Report...');
 }
 
-function showImportDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('IMPORTdialog')
+// This is the new central function for showing the dialog.
+// It uses an HTML template to pass the 'shouldProcess' variable to the dialog's javascript.
+function showImportDialog(shouldProcess) {
+  const template = HtmlService.createTemplateFromFile('IMPORTdialog');
+  template.shouldProcess = shouldProcess || false; // Pass the flag to the template
+  const html = template.evaluate()
     .setWidth(400)
     .setHeight(250);
   SpreadsheetApp.getUi().showModalDialog(html, 'Import File from Computer');
@@ -86,4 +95,3 @@ function importData(fileContent, fileType) {
     return 'Error: Could not parse the file. Please ensure it is a valid CSV or TXT file.';
   }
 }
-

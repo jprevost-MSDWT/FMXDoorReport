@@ -1,9 +1,10 @@
 // Project Name: Door Report Full
-// Project Version: 3.0
+// Project Version: 5.0
 // Filename: Stage3.gs
-// File Version: 3.01
+// File Version: 5.00
+// Description: A combined file of all .gs scripts for easy testing.
 
-// This script generates two reports ("AutoReport" and "AutoReport w/Notes") from Output-Helper2, applying formatting and trimming.
+// This script generates two reports ("AutoReport" and "AutoReport w/Notes"), applying formatting and trimming.
 
 function copySelectedDataToAutoReport() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -70,12 +71,119 @@ function processAndWriteData(ss, sourceHeaders, selectedRows, destinationSheetNa
     destinationSheet.getRange(2, 1, outputData.length, outputData[0].length).setValues(outputData);
   }
   
-  PrintPageFormattingandTrim(destinationSheetName);
+  PrintPageFullFormatting(destinationSheetName);
 }
 
-function PrintPageFormattingandTrim(sheetName) {
+function PrintPageFullFormatting(sheetName) {
+  PrintPageSort(sheetName);
+  AddBlankDates(sheetName);
+  PrintPageRows(sheetName);
   PrintPageFormattingONLY(sheetName);
   trimSheet(sheetName);
+}
+
+function PrintPageRows(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet || sheet.getLastRow() <= 2) {
+    return; // Not enough data to compare rows
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const dateColIndex = headers.indexOf("Date");
+
+  if (dateColIndex === -1) {
+    console.log("Date column not found. Cannot insert rows.");
+    return;
+  }
+
+  const dataRange = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn());
+  const dataValues = dataRange.getValues();
+
+  // Iterate backwards to avoid issues with row index changes after insertion
+  for (let i = dataValues.length - 1; i > 0; i--) {
+    const currentDate = new Date(dataValues[i][dateColIndex]);
+    const previousDate = new Date(dataValues[i - 1][dateColIndex]);
+
+    if (!isNaN(currentDate.getTime()) && !isNaN(previousDate.getTime())) {
+      const currentDay = currentDate.getDay();   // Day of the week for the current row (e.g., Sat)
+      const previousDay = previousDate.getDay(); // Day of the week for the row above it (e.g., Fri)
+
+      // Check for Friday (5) to Saturday (6) transition
+      const isWeekendBreak = previousDay === 5 && currentDay === 6;
+      // Check for Sunday (0) to Monday (1) transition
+      const isWeekStartBreak = previousDay === 0 && currentDay === 1;
+
+      if (isWeekendBreak || isWeekStartBreak) {
+        // The row index is i + 1 because data starts at row 2 and i is 0-indexed.
+        sheet.insertRowAfter(i + 1);
+      }
+    }
+  }
+}
+
+function AddBlankDates(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return; // Not enough data to process
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const dateColIndex = headers.indexOf("Date");
+
+  if (dateColIndex === -1) {
+    console.log("Date column not found. Cannot add blank dates.");
+    return;
+  }
+
+  const dataValues = sheet.getRange(2, dateColIndex + 1, sheet.getLastRow() - 1, 1).getValues();
+
+  // Iterate backwards to safely insert rows
+  for (let i = dataValues.length - 1; i > 0; i--) {
+    const currentDate = new Date(dataValues[i][0]);
+    const previousDate = new Date(dataValues[i - 1][0]);
+
+    if (isNaN(currentDate.getTime()) || isNaN(previousDate.getTime())) {
+      continue; // Skip if dates are invalid
+    }
+
+    const oneDay = 24 * 60 * 60 * 1000;
+    // Calculate the difference in days, ignoring time components
+    const diffDays = Math.round((currentDate.setHours(0, 0, 0, 0) - previousDate.setHours(0, 0, 0, 0)) / oneDay);
+
+    if (diffDays > 1) {
+      // Loop to insert a row for each missing day
+      for (let j = diffDays - 1; j >= 1; j--) {
+        const missingDate = new Date(previousDate.getTime());
+        missingDate.setDate(missingDate.getDate() + j);
+
+        // Row index in the sheet is i + 1 (data starts at row 2, i is 0-indexed)
+        const insertRowIndex = i + 1; 
+        sheet.insertRowAfter(insertRowIndex);
+        sheet.getRange(insertRowIndex + 1, dateColIndex + 1).setValue(missingDate);
+      }
+    }
+  }
+}
+
+function PrintPageSort(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return; // No data to sort
+  }
+
+  const range = sheet.getDataRange();
+  const dataToSort = range.offset(1, 0, range.getNumRows() - 1);
+  dataToSort.sort([
+    { column: 1, ascending: true },
+    { column: 3, ascending: true },
+    { column: 2, ascending: true }
+  ]);
 }
 
 function PrintPageFormattingONLY(sheetName) {
@@ -100,13 +208,6 @@ function PrintPageFormattingONLY(sheetName) {
     range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
     return;
   }
-
-  const dataToSort = range.offset(1, 0, range.getNumRows() - 1);
-  dataToSort.sort([
-    { column: 1, ascending: true },
-    { column: 3, ascending: true },
-    { column: 2, ascending: true }
-  ]);
 
   range.setFontColor("#000000");
   sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7").setFontWeight("bold");
@@ -180,8 +281,24 @@ function PrintPageFormattingONLY(sheetName) {
       }
     }
   }
-}
+  
+  // --- Efficient Row Resizing ---
+  const allData = sheet.getDataRange().getValues(); // Read all data in one go
 
+  for (let i = 0; i < allData.length; i++) {
+    const rowNumber = i + 1;
+    // Check if every cell in the row is empty
+    const isRowBlank = allData[i].every(cell => cell === "");
+
+    if (isRowBlank) {
+      // If the row is blank, set its height to 5 pixels
+      sheet.setRowHeight(rowNumber, 5);
+    } else {
+      // If the row has content, auto-resize it
+      sheet.autoResizeRows(rowNumber, 1);
+    }
+  }
+}
 
 function trimSheet(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
