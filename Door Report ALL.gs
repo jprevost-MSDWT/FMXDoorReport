@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
-// Project Version: 3.0
+// Project Version: 3.2
 // Filename: Door Report ALL.gs
-// File Version: 3.01
+// File Version: 3.19
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -10,9 +10,9 @@
 
 const CONFIG = {
   sheets: {
-    import: "Import",
+    import: "Import",    // Do NOT change. Also used in HTML
     helper1: "Output-Helper1",
-    helper2: "Output-Helper2",
+    helper2: "Report Prep",
     report: "AutoReport",
     reportNotes: "AutoReport w/Notes",
     data: "Data"
@@ -28,17 +28,20 @@ function onOpen() {
   SpreadsheetApp.getUi()
       .createMenu('Report Menu')
       .addItem('Run Full Report', 'FullProcess')
-      .addItem('Reprocess Last Import', 'ReProcess')
+      .addItem('Reprocess', 'ReProcess')
       .addSeparator()
       .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
-          .addItem('Reprocess Last Import', 'ReProcess')
+          .addItem('Import Standard (7 days)', 'ImportStandard')
+          .addItem('Import Alt (14 days)', 'ImportAlt')
+          .addItem('Import Box', 'Import')
+          .addItem('Import & Proccess', 'ReImport')
           .addItem('Run Stage 1', 'Stage1')
           .addItem('Run Stage 2', 'Stage2')
           .addItem('Run Stage 3', 'Stage3'))
       .addSeparator()
       .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
-          .addItem('Import Standard (7 days)', 'ImportStandard')
-          .addItem('Import Alt (14 days)', 'ImportAlt'))
+          .addItem('Testing1', 'Testing1')
+          .addItem('Testing2', 'Testing2'))
       .addToUi();
 }
 
@@ -54,33 +57,41 @@ function VerifySheets() {
   });
 }
 
+// This function now starts the download, which will trigger the import dialog to run the full process.
 function FullProcess(){
-  NewImport();
-  Stage1();
-  Stage2();
-  Stage3();
+  ImportReport_Auto(CONFIG.reportRanges.standard, true);
 }
 
+// This menu item now opens the dialog and tells it to run all stages after import.
+function ReImport(){
+  showImportDialog(true);
+}
+
+// This function remains the same, processing already imported data.
 function ReProcess(){
   Stage1();
   Stage2();
   Stage3();
 }
 
-function NewImport(){
-  ImportStandard();
+// A new central function to run all processing stages. This will be called from the HTML dialog.
+function ProcessStages() {
+  Stage1();
+  Stage2();
+  Stage3();
 }
 
 function ImportStandard() {
-  ImportReport_Auto(CONFIG.reportRanges.standard);
+  ImportReport_Auto(CONFIG.reportRanges.standard, false);
 }
 
 function ImportAlt() {
-  ImportReport_Auto(CONFIG.reportRanges.alt);
+  ImportReport_Auto(CONFIG.reportRanges.alt, false);
 }
 
-function ReImport(){
-  runSecondScript();
+// This menu item opens the dialog for import only.
+function Import(){
+  showImportDialog(false);
 }
 
 function Stage1(){
@@ -95,6 +106,14 @@ function Stage3(){
   copySelectedDataToAutoReport();
 }
 
+function Testing1(){
+  PrintFormatTesting();
+}
+
+function Testing2(){
+  AddBlankDates("AutoReport w/Notes");
+}
+
 // =======================================================================================
 // --- END Inserted Code from Stage0 - Launcher.gs ---
 // =======================================================================================
@@ -104,8 +123,9 @@ function Stage3(){
 // --- BEGIN Inserted Code from Stage0 Import.gs ---
 // =======================================================================================
 
-function runSecondScript() {
-  showImportDialog();
+// This function now receives the shouldProcess flag and passes it to the dialog.
+function runSecondScript(shouldProcess) {
+  showImportDialog(shouldProcess);
 }
 
 function formatDate(date) {
@@ -115,7 +135,8 @@ function formatDate(date) {
   return year + '-' + month + '-' + day;
 }
 
-function ImportReport_Auto(days) {
+// This function now accepts the shouldProcess flag to pass it along the chain.
+function ImportReport_Auto(days, shouldProcess) {
   var today = new Date();
   var futureDate = new Date();
   futureDate.setDate(today.getDate() + days);
@@ -125,12 +146,13 @@ function ImportReport_Auto(days) {
 
   var url = 'https://warrenk12.gofmx.com/scheduling/occurrences?format=csv&useOnlySelectedColumns=False&from=' + fromDate + '&to=' + toDate;
 
+  // The client-side script now calls runSecondScript with the shouldProcess flag.
   const htmlScript = `
     <script>
       window.open('${url}', '_blank');
       google.script.run
         .withSuccessHandler(google.script.host.close)
-        .runSecondScript();
+        .runSecondScript(${shouldProcess});
     </script>
   `;
   const htmlOutput = HtmlService.createHtmlOutput(htmlScript)
@@ -140,8 +162,12 @@ function ImportReport_Auto(days) {
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Opening Report...');
 }
 
-function showImportDialog() {
-  const html = HtmlService.createHtmlOutputFromFile('IMPORTdialog')
+// This is the new central function for showing the dialog.
+// It uses an HTML template to pass the 'shouldProcess' variable to the dialog's javascript.
+function showImportDialog(shouldProcess) {
+  const template = HtmlService.createTemplateFromFile('IMPORTdialog');
+  template.shouldProcess = shouldProcess || false; // Pass the flag to the template
+  const html = template.evaluate()
     .setWidth(400)
     .setHeight(250);
   SpreadsheetApp.getUi().showModalDialog(html, 'Import File from Computer');
@@ -957,12 +983,119 @@ function processAndWriteData(ss, sourceHeaders, selectedRows, destinationSheetNa
     destinationSheet.getRange(2, 1, outputData.length, outputData[0].length).setValues(outputData);
   }
   
-  PrintPageFormattingandTrim(destinationSheetName);
+  PrintPageFullFormatting(destinationSheetName);
 }
 
-function PrintPageFormattingandTrim(sheetName) {
+function PrintPageFullFormatting(sheetName) {
+  PrintPageSort(sheetName);
+  AddBlankDates(sheetName);
+  PrintPageRows(sheetName);
   PrintPageFormattingONLY(sheetName);
   trimSheet(sheetName);
+}
+
+function PrintPageRows(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet || sheet.getLastRow() <= 2) {
+    return; // Not enough data to compare rows
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const dateColIndex = headers.indexOf("Date");
+
+  if (dateColIndex === -1) {
+    console.log("Date column not found. Cannot insert rows.");
+    return;
+  }
+
+  const dataRange = sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn());
+  const dataValues = dataRange.getValues();
+
+  // Iterate backwards to avoid issues with row index changes after insertion
+  for (let i = dataValues.length - 1; i > 0; i--) {
+    const currentDate = new Date(dataValues[i][dateColIndex]);
+    const previousDate = new Date(dataValues[i - 1][dateColIndex]);
+
+    if (!isNaN(currentDate.getTime()) && !isNaN(previousDate.getTime())) {
+      const currentDay = currentDate.getDay();   // Day of the week for the current row (e.g., Sat)
+      const previousDay = previousDate.getDay(); // Day of the week for the row above it (e.g., Fri)
+
+      // Check for Friday (5) to Saturday (6) transition
+      const isWeekendBreak = previousDay === 5 && currentDay === 6;
+      // Check for Sunday (0) to Monday (1) transition
+      const isWeekStartBreak = previousDay === 0 && currentDay === 1;
+
+      if (isWeekendBreak || isWeekStartBreak) {
+        // The row index is i + 1 because data starts at row 2 and i is 0-indexed.
+        sheet.insertRowAfter(i + 1);
+      }
+    }
+  }
+}
+
+function AddBlankDates(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return; // Not enough data to process
+  }
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const dateColIndex = headers.indexOf("Date");
+
+  if (dateColIndex === -1) {
+    console.log("Date column not found. Cannot add blank dates.");
+    return;
+  }
+
+  const dataValues = sheet.getRange(2, dateColIndex + 1, sheet.getLastRow() - 1, 1).getValues();
+
+  // Iterate backwards to safely insert rows
+  for (let i = dataValues.length - 1; i > 0; i--) {
+    const currentDate = new Date(dataValues[i][0]);
+    const previousDate = new Date(dataValues[i - 1][0]);
+
+    if (isNaN(currentDate.getTime()) || isNaN(previousDate.getTime())) {
+      continue; // Skip if dates are invalid
+    }
+
+    const oneDay = 24 * 60 * 60 * 1000;
+    // Calculate the difference in days, ignoring time components
+    const diffDays = Math.round((currentDate.setHours(0, 0, 0, 0) - previousDate.setHours(0, 0, 0, 0)) / oneDay);
+
+    if (diffDays > 1) {
+      // Loop to insert a row for each missing day
+      for (let j = diffDays - 1; j >= 1; j--) {
+        const missingDate = new Date(previousDate.getTime());
+        missingDate.setDate(missingDate.getDate() + j);
+
+        // Row index in the sheet is i + 1 (data starts at row 2, i is 0-indexed)
+        const insertRowIndex = i + 1; 
+        sheet.insertRowAfter(insertRowIndex);
+        sheet.getRange(insertRowIndex + 1, dateColIndex + 1).setValue(missingDate);
+      }
+    }
+  }
+}
+
+function PrintPageSort(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(sheetName);
+
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return; // No data to sort
+  }
+
+  const range = sheet.getDataRange();
+  const dataToSort = range.offset(1, 0, range.getNumRows() - 1);
+  dataToSort.sort([
+    { column: 1, ascending: true },
+    { column: 3, ascending: true },
+    { column: 2, ascending: true }
+  ]);
 }
 
 function PrintPageFormattingONLY(sheetName) {
@@ -987,13 +1120,6 @@ function PrintPageFormattingONLY(sheetName) {
     range.setBorder(true, true, true, true, false, false, "#000000", SpreadsheetApp.BorderStyle.SOLID_THICK);
     return;
   }
-
-  const dataToSort = range.offset(1, 0, range.getNumRows() - 1);
-  dataToSort.sort([
-    { column: 1, ascending: true },
-    { column: 3, ascending: true },
-    { column: 2, ascending: true }
-  ]);
 
   range.setFontColor("#000000");
   sheet.getRange(1, 1, 1, range.getNumColumns()).setBackground("#b7b7b7").setFontWeight("bold");
@@ -1065,6 +1191,23 @@ function PrintPageFormattingONLY(sheetName) {
       } else if (currentBuilding !== previousBuilding) {
         sheet.getRange(i + 2, 1, 1, sheet.getLastColumn()).setBorder(true, null, null, null, false, false, "#000000", SpreadsheetApp.BorderStyle.DASHED);
       }
+    }
+  }
+  
+  // --- Efficient Row Resizing ---
+  const allData = sheet.getDataRange().getValues(); // Read all data in one go
+
+  for (let i = 0; i < allData.length; i++) {
+    const rowNumber = i + 1;
+    // Check if every cell in the row is empty
+    const isRowBlank = allData[i].every(cell => cell === "");
+
+    if (isRowBlank) {
+      // If the row is blank, set its height to 5 pixels
+      sheet.setRowHeight(rowNumber, 5);
+    } else {
+      // If the row has content, auto-resize it
+      sheet.autoResizeRows(rowNumber, 1);
     }
   }
 }
