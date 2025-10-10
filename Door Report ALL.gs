@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
-// Project Version: 4.0
+// Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 4.02
+// File Version: 5.00
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -189,7 +189,7 @@ function Stage3(){
 }
 
 function Testing1(){
-  // This function is not defined.
+  // This function is in a separate testing file.
   // PrintFormatTesting(); 
 }
 
