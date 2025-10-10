@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.00
+// File Version: 5.01
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -59,6 +59,7 @@ function onOpen() {
       .createMenu('Report Menu')
       .addItem('Run Full Report', 'FullProcess')
       .addItem('Reprocess', 'ReProcess')
+      .addItem('Resort Report Prep Sheet', 'ResortStage2')
       .addSeparator()
       .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
           .addItem('Import Standard (7 days)', 'ImportStandard')
@@ -66,7 +67,7 @@ function onOpen() {
           .addItem('Import Box', 'Import')
           .addItem('Import & Proccess', 'ReImport')
           .addItem('Run Stage 1', 'Stage1')
-          .addItem('Run Stage 2', 'Stage2')
+          .addItem('Run Stage 2 (Initial Filter)', 'Stage2')
           .addItem('Run Stage 3', 'Stage3'))
       .addSeparator()
       .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
@@ -181,7 +182,12 @@ function Stage1(){
 }
 
 function Stage2(){
-  stage2_filterProcessedData();
+  Stage2_InitialFilter();
+  Stage2_ResortAndFormat();
+}
+
+function ResortStage2() {
+  Stage2_ResortAndFormat();
 }
 
 function Stage3(){
@@ -617,19 +623,11 @@ function combineDoorValues(row, columnNames, indexes) {
 // --- BEGIN Inserted Code from Stage2.gs ---
 // =======================================================================================
 
-/**
- * =======================================================================================
- * STAGE 2 - FILTER SCRIPT (Version 3.01)
- * =======================================================================================
- * This script filters data from Stage1, removes duplicates, sorts it, and applies formatting.
- */
-function stage2_filterProcessedData() {
-  // Get the active spreadsheet and the relevant sheets
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sourceSheet = ss.getSheetByName(CONFIG.sheets.helper1); // Data from Stage1
-  var destinationSheet = ss.getSheetByName(CONFIG.sheets.helper2); // Where the filtered data will go
+function Stage2_InitialFilter() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sourceSheet = ss.getSheetByName(CONFIG.sheets.helper1);
+  const destinationSheet = ss.getSheetByName(CONFIG.sheets.helper2);
 
-  // Basic error handling to ensure sheets exist
   if (!sourceSheet) {
     throw new Error('Source sheet "' + CONFIG.sheets.helper1 + '" not found!');
   }
@@ -637,186 +635,132 @@ function stage2_filterProcessedData() {
     throw new Error('Destination sheet "' + CONFIG.sheets.helper2 + '" not found!');
   }
 
-  // Get all the data from the source sheet
-  var data = sourceSheet.getDataRange().getValues();
-  
-  // The first row contains the headers
-  var headers = data.shift(); 
-  
-  // --- Step 1: Filter Rows based on Status ---
-  var statusColIndex = headers.indexOf('Status');
+  const data = sourceSheet.getDataRange().getValues();
+  const headers = data.shift();
+
+  const statusColIndex = headers.indexOf('Status');
   if (statusColIndex === -1) {
     throw new Error('"Status" column could not be found in the source sheet "' + CONFIG.sheets.helper1 + '".');
   }
-  var excludedStatuses = ["Declined", "Canceled", "Deleted", "Bulk Declined", "Bulk Canceled", "Bulk Deleted"];
-  var filteredRows = data.filter(function(row) {
-    var status = row[statusColIndex]; 
-    return !excludedStatuses.includes(status);
+  const excludedStatuses = ["Declined", "Canceled", "Deleted", "Bulk Declined", "Bulk Canceled", "Bulk Deleted"];
+  const filteredRows = data.filter(row => !excludedStatuses.includes(row[statusColIndex]));
+
+  const columnsToRemove = headers.reduce((acc, header, index) => {
+    if (header.includes("Combined Door Times")) {
+      acc.push(index);
+    }
+    return acc;
+  }, []);
+
+  const newHeaders = headers.filter((_, index) => !columnsToRemove.includes(index));
+  let processedData = filteredRows.map(row => row.filter((_, index) => !columnsToRemove.includes(index)));
+
+  const targetDate = calculateTargetDate();
+  targetDate.setHours(0, 0, 0, 0);
+
+  const eventDateColIndex_forSelect = newHeaders.indexOf('Event Date');
+  const doorTimesColIndex_forSelect = newHeaders.indexOf('Door Times');
+  newHeaders.unshift("Selected");
+
+  processedData = processedData.map(row => {
+    let shouldBeChecked = false;
+    const eventDate = eventDateColIndex_forSelect !== -1 ? parseDate(row[eventDateColIndex_forSelect]) : null;
+    const hasDoorTimes = doorTimesColIndex_forSelect !== -1 && row[doorTimesColIndex_forSelect] && row[doorTimesColIndex_forSelect].toString().trim() !== '';
+
+    if (eventDate && hasDoorTimes) {
+      eventDate.setHours(0, 0, 0, 0);
+      if (eventDate <= targetDate) {
+        shouldBeChecked = true;
+      }
+    }
+    return [shouldBeChecked, ...row];
   });
   
-  // --- Step 2: Filter Columns to remove "Combined Door Times" ---
-  var columnsToRemove = [];
-  headers.forEach(function(header, index) {
-    if (header.includes("Combined Door Times")) {
-      columnsToRemove.push(index);
-    }
-  });
-  var newHeaders = headers.filter(function(_, index) {
-    return !columnsToRemove.includes(index);
-  });
-  var processedData = filteredRows.map(function(row) {
-    return row.filter(function(_, index) {
-      return !columnsToRemove.includes(index);
-    });
-  });
+  const finalData = [newHeaders, ...processedData];
+  destinationSheet.clear();
+  destinationSheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
+}
 
-  // --- Calculate the date range for auto-selection ---
-  var targetDate = calculateTargetDate();
-  targetDate.setHours(0, 0, 0, 0); // Normalize to compare dates only
+function Stage2_ResortAndFormat() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.sheets.helper2);
 
-  // --- Step 3: Add "Selected" column data based on Target Date & Door Times ---
-  var eventDateColIndex_forSelect = newHeaders.indexOf('Event Date');
-  var doorTimesColIndex_forSelect = newHeaders.indexOf('Door Times'); // Get Door Times index
-  newHeaders.unshift("Selected"); // Add header for the new column
+  if (!sheet || sheet.getLastRow() < 1) {
+    // If the sheet is empty or doesn't exist, there's nothing to sort.
+    return;
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift();
 
-  processedData.forEach(function(row) {
-    var shouldBeChecked = false;
-
-    // Condition 1: Check if the date is in range
-    var isDateInRange = false;
-    if (eventDateColIndex_forSelect !== -1) {
-      var eventDate = parseDate(row[eventDateColIndex_forSelect]);
-      if (eventDate) {
-        eventDate.setHours(0, 0, 0, 0);
-        if (eventDate <= targetDate) {
-          isDateInRange = true;
-        }
-      }
-    }
-
-    // Condition 2: Check if "Door Times" has data
-    var hasDoorTimes = false;
-    if (doorTimesColIndex_forSelect !== -1) {
-      var doorTimesData = row[doorTimesColIndex_forSelect];
-      if (doorTimesData && doorTimesData.toString().trim() !== '') {
-        hasDoorTimes = true;
-      }
-    }
-
-    // A row is only selected if BOTH conditions are true
-    if (isDateInRange && hasDoorTimes) {
-      shouldBeChecked = true;
-    }
-
-    row.unshift(shouldBeChecked);
-  });
-
-
-  // --- Step 4: Remove Duplicates ---
-  var uniqueData = [];
-  var seenRows = {};
-  var idColIndex = newHeaders.indexOf('ID');
-  var areasColIndex = newHeaders.indexOf('Areas');
-  processedData.forEach(function(row) {
-    var rowKey = row.filter(function(cell, index) {
-      return index !== 0 && index !== idColIndex && index !== areasColIndex;
-    }).join('|');
-    if (!seenRows[rowKey]) {
-      seenRows[rowKey] = true;
+  const idColIndex = headers.indexOf('ID');
+  const areasColIndex = headers.indexOf('Areas');
+  
+  let uniqueData = [];
+  const seenRows = new Set();
+  data.forEach(row => {
+    const rowKey = row.filter((_, index) => index !== 0 && index !== idColIndex && index !== areasColIndex).join('|');
+    if (!seenRows.has(rowKey)) {
+      seenRows.add(rowKey);
       uniqueData.push(row);
     }
   });
 
-  // --- Step 5: Sort Data ---
-  var eventDateColIndex = newHeaders.indexOf('Event Date');
-  var buildingColIndex = newHeaders.indexOf('Building');
-  var eventTimeColIndex = newHeaders.indexOf('Event Time');
-  var statusColIndex_forSort = newHeaders.indexOf('Status');
-  var doorTimesColIndex_forSort = newHeaders.indexOf('Door Times');
-  var selectedColIndex = 0; // "Selected" is always the first column
+  const eventDateColIndex = headers.indexOf('Event Date');
+  const buildingColIndex = headers.indexOf('Building');
+  const eventTimeColIndex = headers.indexOf('Event Time');
+  const statusColIndex_forSort = headers.indexOf('Status');
+  const doorTimesColIndex_forSort = headers.indexOf('Door Times');
+  const selectedColIndex = 0;
 
-  uniqueData.sort(function(a, b) {
-    // --- Priority 1: "Selected" Checkbox ---
-    var aIsSelected = a[selectedColIndex] === true;
-    var bIsSelected = b[selectedColIndex] === true;
+  uniqueData.sort((a, b) => {
+    const aIsSelected = a[selectedColIndex] === true;
+    const bIsSelected = b[selectedColIndex] === true;
+    if (aIsSelected !== bIsSelected) return aIsSelected ? -1 : 1;
 
-    if (aIsSelected && !bIsSelected) {
-      return -1; // 'a' comes first
-    }
-    if (!aIsSelected && bIsSelected) {
-      return 1; // 'b' comes first
+    if (!aIsSelected) {
+      const aHasDoorTimes = a[doorTimesColIndex_forSort] && a[doorTimesColIndex_forSort].toString().trim() !== '';
+      const bHasDoorTimes = b[doorTimesColIndex_forSort] && b[doorTimesColIndex_forSort].toString().trim() !== '';
+      if (aHasDoorTimes !== bHasDoorTimes) return aHasDoorTimes ? -1 : 1;
     }
 
-    // --- Priority 2: For UNSELECTED rows, sort by "Door Times" presence ---
-    if (!aIsSelected && !bIsSelected) {
-      var aHasDoorTimes = a[doorTimesColIndex_forSort] && a[doorTimesColIndex_forSort].toString().trim() !== '';
-      var bHasDoorTimes = b[doorTimesColIndex_forSort] && b[doorTimesColIndex_forSort].toString().trim() !== '';
-      if (aHasDoorTimes && !bHasDoorTimes) {
-        return -1; // 'a' comes first
-      }
-      if (!aHasDoorTimes && bHasDoorTimes) {
-        return 1; // 'b' comes first
-      }
-    }
-
-    // --- Priority 3: "Pending Approval" Status (Case-Insensitive) ---
-    var statusA = (a[statusColIndex_forSort] || '').toUpperCase();
-    var statusB = (b[statusColIndex_forSort] || '').toUpperCase();
-    var aIsPending = statusA.includes("PENDING") && statusA.includes("APPROVAL");
-    var bIsPending = statusB.includes("PENDING") && statusB.includes("APPROVAL");
-
-    if (aIsPending && !bIsPending) {
-      return -1; // 'a' comes first
-    }
-    if (!aIsPending && bIsPending) {
-      return 1; // 'b' comes first
-    }
+    const statusA = (a[statusColIndex_forSort] || '').toUpperCase();
+    const statusB = (b[statusColIndex_forSort] || '').toUpperCase();
+    const aIsPending = statusA.includes("PENDING") && statusA.includes("APPROVAL");
+    const bIsPending = statusB.includes("PENDING") && statusB.includes("APPROVAL");
+    if (aIsPending !== bIsPending) return aIsPending ? -1 : 1;
     
-    // --- Priority 4: Fallback to Original Sorting Logic ---
-    var dateA = parseDate(a[eventDateColIndex]);
-    var dateB = parseDate(b[eventDateColIndex]);
-    if (dateA && !dateB) return -1;
-    if (!dateA && dateB) return 1;
-    if (dateA && dateB && (dateA.getTime() !== dateB.getTime())) {
-      return dateA.getTime() - dateB.getTime();
-    }
+    const dateA = parseDate(a[eventDateColIndex]);
+    const dateB = parseDate(b[eventDateColIndex]);
+    if (dateA && dateB && dateA.getTime() !== dateB.getTime()) return dateA.getTime() - dateB.getTime();
     
-    var buildingA = a[buildingColIndex] || '';
-    var buildingB = b[buildingColIndex] || '';
-    var buildingCompare = buildingA.localeCompare(buildingB);
-    if (buildingCompare !== 0) return buildingCompare;
+    const buildingA = a[buildingColIndex] || '';
+    const buildingB = b[buildingColIndex] || '';
+    if (buildingA.localeCompare(buildingB) !== 0) return buildingA.localeCompare(buildingB);
     
-    var timeA = parseTime(a[eventTimeColIndex]);
-    var timeB = parseTime(b[eventTimeColIndex]);
-    if (timeA && !timeB) return -1;
-    if (!timeA && timeB) return 1;
-    if (!timeA && !timeB) return 0;
-    return timeA.getTime() - timeB.getTime();
+    const timeA = parseTime(a[eventTimeColIndex]);
+    const timeB = parseTime(b[eventTimeColIndex]);
+    if (timeA && timeB) return timeA.getTime() - timeB.getTime();
+
+    return 0;
   });
 
-  // --- Step 5.5: Uncheck Pending Approval Rows ---
-  // This step runs after sorting to ensure "Pending" events are at the top but unchecked.
-  uniqueData.forEach(function(row) {
-    var status = (row[statusColIndex_forSort] || '').toUpperCase();
-    var isPending = status.includes("PENDING") && status.includes("APPROVAL");
-    
-    if (isPending) {
-      row[selectedColIndex] = false; // Uncheck the box
+  uniqueData.forEach(row => {
+    const status = (row[statusColIndex_forSort] || '').toUpperCase();
+    if (status.includes("PENDING") && status.includes("APPROVAL")) {
+      row[selectedColIndex] = false;
     }
   });
 
-  // --- Step 6: Write data and call formatter ---
-  var finalData = [newHeaders].concat(uniqueData);
-  destinationSheet.clear();
-  
-  if (finalData.length > 1) { // Check if there is at least a header and one row of data
-    destinationSheet.getRange(1, 1, finalData.length, finalData[0].length).setValues(finalData);
-    Stage2_format(destinationSheet, uniqueData.length, newHeaders);
-  } else {
-    // Also format the sheet even if there's no data, to ensure it's clean
-    Stage2_format(destinationSheet, 0, newHeaders);
+  sheet.clear();
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (uniqueData.length > 0) {
+    sheet.getRange(2, 1, uniqueData.length, headers.length).setValues(uniqueData);
   }
+  
+  Stage2_format(sheet, uniqueData.length, headers);
 }
+
 
 /**
  * =======================================================================================
@@ -1309,3 +1253,4 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
+
