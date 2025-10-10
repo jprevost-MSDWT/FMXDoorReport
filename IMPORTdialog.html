@@ -3,7 +3,7 @@
 * Project Name: Door Report Full
 * Project Version: 5.0
 * Filename: IMPORTdialog.html
-* File Version: 4.00
+* File Version: 4.01
 -->
 <!DOCTYPE html>
 <html>
@@ -66,7 +66,7 @@
 
   <script>
     // This scriptlet receives the 'shouldProcess' variable from the .gs file
-    const shouldProcessAfterImport = <?!= shouldProcess ?>;
+    const shouldProcessAfterImport = '<?!= shouldProcess ?>' === 'true';
 
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
