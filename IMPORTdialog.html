@@ -1,17 +1,14 @@
-<!--
-Project Name: Door Report Full
-Project Version: 2.0
-Filename: IMPORTdialog.html
-File Version: 2.01
+<!-- 
+* Version Tracking
+* Project Name: Door Report Full
+* Project Version: 4.0
+* Filename: IMPORTdialog.html
+* File Version: 3.00
 -->
-<!-- Filename: IMPORTdialog.html -->
-
-
 <!DOCTYPE html>
 <html>
 <head>
   <base target="_top">
-  <!-- Added Tailwind CSS for styling -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
@@ -52,7 +49,6 @@ File Version: 2.01
       margin-top: 20px;
       width: 100%;
     }
-    /* Removed specific button styles as they are now handled by Tailwind CSS */
   </style>
 </head>
 <body>
@@ -63,13 +59,15 @@ File Version: 2.01
   <input type="file" id="fileInput" accept=".csv,.txt,.tsv">
 
   <div id="buttonContainer">
-    <!-- Updated Import button with Tailwind CSS classes and removed Cancel button -->
     <button id="importBtn" disabled class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-gray-400 disabled:cursor-not-allowed">
       Import
     </button>
   </div>
 
   <script>
+    // This scriptlet receives the 'shouldProcess' variable from the .gs file
+    const shouldProcessAfterImport = <?!= shouldProcess ?>;
+
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
     const importBtn = document.getElementById('importBtn');
@@ -108,13 +106,30 @@ File Version: 2.01
       }
     }
     
+    // This function is called after the server-side importData function succeeds.
     function importSuccess(message) {
       console.log(message); // Logs the success message from the server
-      google.script.host.close();
+
+      // Check the flag passed from the server
+      if (shouldProcessAfterImport) {
+        importBtn.textContent = 'Processing...'; // Update UI to show processing has started
+        
+        // Now, run the processing stages
+        google.script.run
+          .withSuccessHandler(function() {
+            // This inner success handler runs after ProcessStages() is complete.
+            google.script.host.close();
+          })
+          .withFailureHandler(importFailure) // We can reuse the same failure handler
+          .ProcessStages(); // Call the server function to run Stage 1, 2, 3
+      } else {
+        // If we are not processing, just close the dialog.
+        google.script.host.close();
+      }
     }
 
     function importFailure(error) {
-      alert('Error during import: ' + error.message);
+      alert('Error during import or processing: ' + error.message);
       // Re-enable the import button if something goes wrong
       importBtn.disabled = false;
       importBtn.textContent = 'Import';
@@ -123,7 +138,6 @@ File Version: 2.01
     importBtn.addEventListener('click', () => {
       if (!selectedFile) return;
 
-      // Disable button to prevent multiple clicks
       importBtn.disabled = true;
       importBtn.textContent = 'Importing...';
 
@@ -132,7 +146,6 @@ File Version: 2.01
         const fileContent = e.target.result;
         const fileType = selectedFile.type;
         
-        // Run the server-side function and wait for a response
         google.script.run
           .withSuccessHandler(importSuccess)
           .withFailureHandler(importFailure)
@@ -143,3 +156,4 @@ File Version: 2.01
   </script>
 </body>
 </html>
+
