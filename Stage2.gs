@@ -310,4 +310,3 @@ function calculateTargetDate() {
   Logger.log('Calculated Target Date: ' + targetDate);
   return targetDate;
 }
-
