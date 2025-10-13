@@ -1,9 +1,8 @@
-
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Stage1.gs
-// File Version: 5.00
-// Description: A combined file of all .gs scripts for easy testing.
+// File Version: 5.02
+// Description: Cleans and processes the raw imported data.
 
 // This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes duplicates, and sorts.
 
@@ -305,3 +304,4 @@ function combineDoorValues(row, columnNames, indexes) {
   }
   return currentDoors.join(", ");
 }
+
