@@ -1,9 +1,8 @@
-
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Stage0 - Launcher.gs
-// File Version: 5.00
-// Description: A combined file of all .gs scripts for easy testing.
+// File Version: 5.02
+// Description: Main launcher and menu configuration.
 
 const CONFIG = {
   sheets: {
@@ -56,6 +55,7 @@ function onOpen() {
       .createMenu('Report Menu')
       .addItem('Run Full Report', 'FullProcess')
       .addItem('Reprocess', 'ReProcess')
+      .addItem('Resort Report Prep Sheet', 'ResortStage2')
       .addSeparator()
       .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
           .addItem('Import Standard (7 days)', 'ImportStandard')
@@ -178,7 +178,12 @@ function Stage1(){
 }
 
 function Stage2(){
-  stage2_filterProcessedData();
+  Stage2_InitialFilter();
+  Stage2_ResortAndFormat();
+}
+
+function ResortStage2() {
+  Stage2_ResortAndFormat();
 }
 
 function Stage3(){
@@ -193,3 +198,4 @@ function Testing1(){
 function Testing2(){
   AddBlankDates("AutoReport w/Notes");
 }
+
