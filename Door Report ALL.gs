@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.01
+// File Version: 5.02
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -67,7 +67,7 @@ function onOpen() {
           .addItem('Import Box', 'Import')
           .addItem('Import & Proccess', 'ReImport')
           .addItem('Run Stage 1', 'Stage1')
-          .addItem('Run Stage 2 (Initial Filter)', 'Stage2')
+          .addItem('Run Stage 2', 'Stage2')
           .addItem('Run Stage 3', 'Stage3'))
       .addSeparator()
       .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
@@ -732,7 +732,11 @@ function Stage2_ResortAndFormat() {
     
     const dateA = parseDate(a[eventDateColIndex]);
     const dateB = parseDate(b[eventDateColIndex]);
-    if (dateA && dateB && dateA.getTime() !== dateB.getTime()) return dateA.getTime() - dateB.getTime();
+    if (dateA && !dateB) return -1;
+    if (!dateA && dateB) return 1;
+    if (dateA && dateB && (dateA.getTime() !== dateB.getTime())) {
+      return dateA.getTime() - dateB.getTime();
+    }
     
     const buildingA = a[buildingColIndex] || '';
     const buildingB = b[buildingColIndex] || '';
@@ -1253,4 +1257,3 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
-

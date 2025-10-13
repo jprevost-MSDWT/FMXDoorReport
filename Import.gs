@@ -1,9 +1,8 @@
-
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Stage0 Import.gs
-// File Version: 5.00
-// Description: A combined file of all .gs scripts for easy testing.
+// File Version: 5.02
+// Description: Handles the import process, including the HTML dialog.
 
 // This function now receives the shouldProcess flag and passes it to the dialog.
 function runSecondScript(shouldProcess) {
@@ -95,3 +94,4 @@ function importData(fileContent, fileType) {
     return 'Error: Could not parse the file. Please ensure it is a valid CSV or TXT file.';
   }
 }
+
