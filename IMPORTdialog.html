@@ -66,7 +66,7 @@
 
   <script>
     // This scriptlet receives the 'shouldProcess' variable from the .gs file
-    const shouldProcessAfterImport = '<?!= shouldProcess ?>' === 'true';
+    const shouldProcessAfterImport = <?= shouldProcess ?>;
 
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('fileInput');
