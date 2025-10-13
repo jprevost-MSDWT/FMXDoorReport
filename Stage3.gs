@@ -1,10 +1,10 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Stage3.gs
-// File Version: 5.00
-// Description: A combined file of all .gs scripts for easy testing.
+// File Version: 5.02
+// Description: Generates the final, formatted reports.
 
-// This script generates two reports ("AutoReport" and "AutoReport w/Notes"), applying formatting and trimming.
+// This script generates two reports ("AutoReport" and "AutoReport w/Notes") from Output-Helper2, applying formatting and trimming.
 
 function copySelectedDataToAutoReport() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
