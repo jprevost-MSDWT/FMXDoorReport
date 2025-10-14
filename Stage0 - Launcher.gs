@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Stage0 - Launcher.gs
-// File Version: 5.03
+// File Version: 5.04
 // Description: Main launcher and menu configuration.
 
 const CONFIG = {
@@ -49,7 +49,8 @@ const CONFIG = {
   }
 };
 
-function onOpen() {
+function onOpenTrigger() {
+  // This is triggered by an installed trigger.
   VerifySheets();
   Menu(); 
   SideMenu(); 
@@ -233,4 +234,5 @@ function Testing1(){
 function Testing2(){
   AddBlankDates("AutoReport w/Notes");
 }
+
 
