@@ -53,7 +53,7 @@ const CONFIG = {
   }
 };
 
-function onOpen() {
+function onOpenTrigger() {
   VerifySheets();
   Menu(); 
   SideMenu(); 
