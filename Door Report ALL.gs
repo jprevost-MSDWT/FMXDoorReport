@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.02
+// File Version: 5.03
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -55,26 +55,60 @@ const CONFIG = {
 
 function onOpen() {
   VerifySheets();
-  SpreadsheetApp.getUi()
-      .createMenu('Report Menu')
-      .addItem('Run Full Report', 'FullProcess')
-      .addItem('Reprocess', 'ReProcess')
-      .addItem('Resort Report Prep Sheet', 'ResortStage2')
-      .addSeparator()
-      .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
-          .addItem('Import Standard (7 days)', 'ImportStandard')
-          .addItem('Import Alt (14 days)', 'ImportAlt')
-          .addItem('Import Box', 'Import')
-          .addItem('Import & Proccess', 'ReImport')
-          .addItem('Run Stage 1', 'Stage1')
-          .addItem('Run Stage 2', 'Stage2')
-          .addItem('Run Stage 3', 'Stage3'))
-      .addSeparator()
-      .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
-          .addItem('Testing1', 'Testing1')
-          .addItem('Testing2', 'Testing2'))
-      .addToUi();
+  Menu(); 
+  SideMenu(); 
 }
+
+// ==========================
+// Menues
+// ==========================
+
+function Menu() {
+  SpreadsheetApp.getUi()
+    .createMenu('Report Menu')
+    .addItem('Run Full Report', 'FullProcess')
+    .addItem('Reprocess', 'ReProcess')
+    .addItem('Resort Report Prep Sheet', 'ResortStage2')
+    .addItem('Go to Report Prep Sheet', 'goToReportPrepSheet')
+    .addItem('Reopen Sidebar Menu', 'SideMenu')
+    .addSeparator()
+    .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
+      .addItem('Import Standard (7 days)', 'ImportStandard')
+      .addItem('Import Alt (14 days)', 'ImportAlt')
+      .addItem('Import Box', 'showImportDialog') // Changed from 'Import'
+      .addItem('Import & Proccess', 'ReImport')
+      .addItem('Run Stage 1', 'Stage1')
+      .addItem('Run Stage 2', 'Stage2')
+      .addItem('Run Stage 3', 'Stage3'))
+    .addSeparator()
+    .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
+      .addItem('Testing1', 'Testing1')
+      .addItem('Testing2', 'Testing2'))
+    .addToUi();
+}
+
+
+// Sidebar menu features
+
+function SideMenu() {
+  var html = HtmlService.createHtmlOutputFromFile('Sidebar')
+      .setTitle('Report Actions');
+  SpreadsheetApp.getUi().showSidebar(html);
+}
+
+// New navigation functions
+function goToAutoReport() {
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AutoReport').activate();
+}
+
+function goToAutoReportWithNotes() {
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AutoReport w/Notes').activate();
+}
+
+function goToReportPrepSheet() {
+  SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Report Prep').activate();
+}
+
 
 function VerifySheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -173,9 +207,10 @@ function ImportAlt() {
 }
 
 // This menu item opens the dialog for import only.
-function Import(){
-  showImportDialog(false);
-}
+// The original 'Import' function is no longer needed as the menu calls showImportDialog directly.
+// function Import(){
+//  showImportDialog(false);
+// }
 
 function Stage1(){
   FMX_Doors_AutoImport_V8();
@@ -1257,3 +1292,4 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
+
