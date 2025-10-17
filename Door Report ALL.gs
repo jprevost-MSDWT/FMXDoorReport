@@ -19,7 +19,8 @@ const CONFIG = {
   },
   reportRanges: {
     standard: 7,
-    alt: 14
+    alt: 14,
+    altSelected: 7
   },
   columnNames: {
     eventTime: ["Event time", "Starts"],
@@ -53,63 +54,30 @@ const CONFIG = {
   }
 };
 
-function onOpenTrigger() {
-  // This is triggered by an installed trigger.
+function onOpen() {
   VerifySheets();
-  Menu(); 
-  SideMenu(); 
-}
-
-// ==========================
-// Menues
-// ==========================
-
-function Menu() {
   SpreadsheetApp.getUi()
-    .createMenu('Report Menu')
-    .addItem('Run Full Report', 'FullProcess')
-    .addItem('Reprocess', 'ReProcess')
-    .addItem('Resort Report Prep Sheet', 'ResortStage2')
-    .addItem('Go to Report Prep Sheet', 'goToReportPrepSheet')
-    .addItem('Reopen Sidebar Menu', 'SideMenu')
-    .addSeparator()
-    .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
-      .addItem('Import Standard (7 days)', 'ImportStandard')
-      .addItem('Import Alt (14 days)', 'ImportAlt')
-      .addItem('Import Box', 'showImportDialog') // Changed from 'Import'
-      .addItem('Import & Proccess', 'ReImport')
-      .addItem('Run Stage 1', 'Stage1')
-      .addItem('Run Stage 2', 'Stage2')
-      .addItem('Run Stage 3', 'Stage3'))
-    .addSeparator()
-    .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
-      .addItem('Testing1', 'Testing1')
-      .addItem('Testing2', 'Testing2'))
-    .addToUi();
+      .createMenu('Report Menu')
+      .addItem('Run Full Report', 'FullProcess')
+      .addItem('Reprocess', 'ReProcess')
+      .addItem('Resort Report Prep Sheet', 'ResortStage2')
+      .addSeparator()
+      .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
+          .addItem('Import Standard (7 days)', 'ImportStandard')
+          .addItem('Import Alt (14 days)', 'ImportAlt')
+          .addItem('Import Box', 'Import')
+          .addItem('Import & Proccess', 'ReImport')
+          .addItem('Run Stage 1', 'Stage1')
+          .addItem('Run Stage 2 (Initial Filter)', 'Stage2')
+          .addItem('Run Stage 3', 'Stage3')
+          .addSeparator()
+          .addItem('Select Last 7 Days', 'altSelectedDays'))
+      .addSeparator()
+      .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
+          .addItem('Testing1', 'Testing1')
+          .addItem('Testing2', 'Testing2'))
+      .addToUi();
 }
-
-
-// Sidebar menu features
-
-function SideMenu() {
-  var html = HtmlService.createHtmlOutputFromFile('Sidebar')
-      .setTitle('Report Actions');
-  SpreadsheetApp.getUi().showSidebar(html);
-}
-
-// New navigation functions
-function goToAutoReport() {
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AutoReport').activate();
-}
-
-function goToAutoReportWithNotes() {
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName('AutoReport w/Notes').activate();
-}
-
-function goToReportPrepSheet() {
-  SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Report Prep').activate();
-}
-
 
 function VerifySheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -208,10 +176,9 @@ function ImportAlt() {
 }
 
 // This menu item opens the dialog for import only.
-// The original 'Import' function is no longer needed as the menu calls showImportDialog directly.
-// function Import(){
-//  showImportDialog(false);
-// }
+function Import(){
+  showImportDialog(false);
+}
 
 function Stage1(){
   FMX_Doors_AutoImport_V8();
@@ -228,6 +195,67 @@ function ResortStage2() {
 
 function Stage3(){
   copySelectedDataToAutoReport();
+}
+
+function altSelectedDays() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.sheets.helper2);
+
+    if (!sheet) {
+      throw new Error(`Sheet "${CONFIG.sheets.helper2}" not found.`);
+    }
+    
+    ss.toast('Updating selections to the last 7 days...', 'Status', -1);
+    Logger.log('Updating selections to the last 7 days...');
+
+    const data = sheet.getDataRange().getValues();
+    const headers = data.shift();
+    
+    const selectedColIndex = headers.indexOf('Selected');
+    const dateColIndex = headers.indexOf('Event Date');
+    const doorTimesColIndex = headers.indexOf('Door Times');
+
+    if (selectedColIndex === -1 || dateColIndex === -1 || doorTimesColIndex === -1) {
+      throw new Error('One or more required columns (Selected, Event Date, Door Times) were not found.');
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const startDate = new Date();
+    startDate.setDate(today.getDate() - CONFIG.reportRanges.altSelected);
+    startDate.setHours(0, 0, 0, 0);
+
+    const updatedSelection = data.map(row => {
+      const eventDate = parseDate(row[dateColIndex]);
+      const hasDoorTimes = row[doorTimesColIndex] && row[doorTimesColIndex].toString().trim() !== '';
+      let shouldBeChecked = false;
+
+      if (eventDate && hasDoorTimes) {
+        eventDate.setHours(0, 0, 0, 0);
+        if (eventDate >= startDate && eventDate <= today) {
+          shouldBeChecked = true;
+        }
+      }
+      return [shouldBeChecked];
+    });
+
+    if (updatedSelection.length > 0) {
+      sheet.getRange(2, selectedColIndex + 1, updatedSelection.length, 1).setValues(updatedSelection);
+    }
+    
+    ss.toast('Selection updated to the last 7 days.', 'Complete', 5);
+    Logger.log('Selection update complete.');
+
+  } catch (e) {
+    Logger.log('An error occurred in altSelectedDays: ' + e.message + '\n' + e.stack);
+    try {
+      const ui = SpreadsheetApp.getUi();
+      ui.alert('An Error Occurred', 'Could not update selections: \n\n' + e.message, ui.ButtonSet.OK);
+    } catch (uiError) {
+      throw e;
+    }
+  }
 }
 
 function Testing1(){
@@ -1293,6 +1321,4 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
-
-
 
