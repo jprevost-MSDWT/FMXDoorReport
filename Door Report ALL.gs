@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.04
+// File Version: 5.06
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -19,7 +19,8 @@ const CONFIG = {
   },
   reportRanges: {
     standard: 7,
-    alt: 14
+    alt: 14,
+    altSelected: 7 // Used for the "next 7 days" selection feature
   },
   columnNames: {
     eventTime: ["Event time", "Starts"],
@@ -76,11 +77,12 @@ function Menu() {
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
       .addItem('Import Standard (7 days)', 'ImportStandard')
       .addItem('Import Alt (14 days)', 'ImportAlt')
-      .addItem('Import Box', 'showImportDialog') // Changed from 'Import'
+      .addItem('Import Box', 'showImportDialog')
       .addItem('Import & Proccess', 'ReImport')
       .addItem('Run Stage 1', 'Stage1')
       .addItem('Run Stage 2', 'Stage2')
-      .addItem('Run Stage 3', 'Stage3'))
+      .addItem('Run Stage 3', 'Stage3')
+      .addItem('Select Next 7 Days', 'altSelectedDays')) // Updated Menu Item Text
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
       .addItem('Testing1', 'Testing1')
@@ -659,6 +661,58 @@ function combineDoorValues(row, columnNames, indexes) {
 // --- BEGIN Inserted Code from Stage2.gs ---
 // =======================================================================================
 
+/**
+ * New function to select rows in Report Prep based on the next N days.
+ */
+function altSelectedDays() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.sheets.helper2);
+  
+  if (!sheet || sheet.getLastRow() < 2) {
+    ss.toast("No data found on the Report Prep sheet to select.", "Status", 5);
+    return;
+  }
+  
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift();
+  
+  const selectedColIndex = headers.indexOf("Selected");
+  const eventDateColIndex = headers.indexOf("Event Date");
+  const doorTimesColIndex = headers.indexOf("Door Times");
+  
+  if (selectedColIndex === -1 || eventDateColIndex === -1 || doorTimesColIndex === -1) {
+    throw new Error("Could not find one of the required columns: 'Selected', 'Event Date', or 'Door Times'.");
+  }
+  
+  const daysToLookForward = CONFIG.reportRanges.altSelected;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Start of today
+
+  const futureDate = new Date();
+  futureDate.setDate(today.getDate() + daysToLookForward);
+  futureDate.setHours(23, 59, 59, 999); // End of the 7th day from now
+  
+  const selections = [];
+  for (const row of data) {
+    const eventDate = parseDate(row[eventDateColIndex]);
+    const hasDoorTimes = row[doorTimesColIndex] && row[doorTimesColIndex].toString().trim() !== '';
+    let shouldBeChecked = false;
+
+    if (eventDate && hasDoorTimes) {
+      if (eventDate >= today && eventDate <= futureDate) {
+        shouldBeChecked = true;
+      }
+    }
+    selections.push([shouldBeChecked]);
+  }
+  
+  // Efficiently update all checkboxes at once
+  sheet.getRange(2, selectedColIndex + 1, selections.length, 1).setValues(selections);
+  
+  ss.toast(`Selections have been updated for the next ${daysToLookForward} days.`, "Complete", 5);
+}
+
+
 function Stage2_InitialFilter() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sourceSheet = ss.getSheetByName(CONFIG.sheets.helper1);
@@ -766,10 +820,11 @@ function Stage2_ResortAndFormat() {
     const bIsPending = statusB.includes("PENDING") && statusB.includes("APPROVAL");
     if (aIsPending !== bIsPending) return aIsPending ? -1 : 1;
     
+    // Updated Date sorting logic
     const dateA = parseDate(a[eventDateColIndex]);
     const dateB = parseDate(b[eventDateColIndex]);
-    if (dateA && !dateB) return -1;
-    if (!dateA && dateB) return 1;
+    if (dateA && !dateB) return -1; // a has a date, b doesn't, so a comes first
+    if (!dateA && dateB) return 1;  // b has a date, a doesn't, so b comes first
     if (dateA && dateB && (dateA.getTime() !== dateB.getTime())) {
       return dateA.getTime() - dateB.getTime();
     }
@@ -1293,6 +1348,4 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
-
-
 
