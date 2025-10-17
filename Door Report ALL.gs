@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.05
+// File Version: 5.06
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -20,7 +20,7 @@ const CONFIG = {
   reportRanges: {
     standard: 7,
     alt: 14,
-    altSelected: 7 // Added for the new selection feature
+    altSelected: 7 // Used for the "next 7 days" selection feature
   },
   columnNames: {
     eventTime: ["Event time", "Starts"],
@@ -82,7 +82,7 @@ function Menu() {
       .addItem('Run Stage 1', 'Stage1')
       .addItem('Run Stage 2', 'Stage2')
       .addItem('Run Stage 3', 'Stage3')
-      .addItem('Select Last 7 Days', 'altSelectedDays')) // New Menu Item
+      .addItem('Select Next 7 Days', 'altSelectedDays')) // Updated Menu Item Text
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Testing')
       .addItem('Testing1', 'Testing1')
@@ -662,7 +662,7 @@ function combineDoorValues(row, columnNames, indexes) {
 // =======================================================================================
 
 /**
- * New function to select rows in Report Prep based on the last N days.
+ * New function to select rows in Report Prep based on the next N days.
  */
 function altSelectedDays() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -684,13 +684,13 @@ function altSelectedDays() {
     throw new Error("Could not find one of the required columns: 'Selected', 'Event Date', or 'Door Times'.");
   }
   
-  const daysToLookBack = CONFIG.reportRanges.altSelected;
+  const daysToLookForward = CONFIG.reportRanges.altSelected;
   const today = new Date();
-  today.setHours(23, 59, 59, 999); // End of today
+  today.setHours(0, 0, 0, 0); // Start of today
 
-  const cutoffDate = new Date();
-  cutoffDate.setDate(today.getDate() - daysToLookBack);
-  cutoffDate.setHours(0, 0, 0, 0); // Start of the cutoff day
+  const futureDate = new Date();
+  futureDate.setDate(today.getDate() + daysToLookForward);
+  futureDate.setHours(23, 59, 59, 999); // End of the 7th day from now
   
   const selections = [];
   for (const row of data) {
@@ -699,7 +699,7 @@ function altSelectedDays() {
     let shouldBeChecked = false;
 
     if (eventDate && hasDoorTimes) {
-      if (eventDate >= cutoffDate && eventDate <= today) {
+      if (eventDate >= today && eventDate <= futureDate) {
         shouldBeChecked = true;
       }
     }
@@ -709,7 +709,7 @@ function altSelectedDays() {
   // Efficiently update all checkboxes at once
   sheet.getRange(2, selectedColIndex + 1, selections.length, 1).setValues(selections);
   
-  ss.toast(`Selections have been updated to the last ${daysToLookBack} days.`, "Complete", 5);
+  ss.toast(`Selections have been updated for the next ${daysToLookForward} days.`, "Complete", 5);
 }
 
 
