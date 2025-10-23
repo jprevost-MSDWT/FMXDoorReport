@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.06
+// File Version: 5.07
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -69,9 +69,9 @@ function Menu() {
   SpreadsheetApp.getUi()
     .createMenu('Report Menu')
     .addItem('Run Full Report', 'FullProcess')
+    .addItem('ReSort Printsheet', 'ReSortPrint')
     .addItem('Reprocess', 'ReProcess')
     .addItem('Resort Report Prep Sheet', 'ResortStage2')
-    .addItem('Go to Report Prep Sheet', 'goToReportPrepSheet')
     .addItem('Reopen Sidebar Menu', 'SideMenu')
     .addSeparator()
     .addSubMenu(SpreadsheetApp.getUi().createMenu('Manual Steps')
@@ -110,6 +110,10 @@ function goToAutoReportWithNotes() {
 
 function goToReportPrepSheet() {
   SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Report Prep').activate();
+}
+
+function ReSortPrint() {
+  PrintPageFullFormatting(CONFIG.sheets.report);
 }
 
 
