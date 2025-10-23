@@ -112,6 +112,10 @@ function goToReportPrepSheet() {
   SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Report Prep').activate();
 }
 
+function ReSortPrint() {
+  PrintPageFullFormatting(CONFIG.sheets.report);
+}
+
 
 function VerifySheets() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
