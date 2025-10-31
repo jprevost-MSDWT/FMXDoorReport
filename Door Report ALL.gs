@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.07
+// File Version: 5.08
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -545,7 +545,7 @@ function FMX_Doors_AutoImport_V8() {
     }).join('\n');
 
     var rowKey = [
-        formattedEventDate, extractedEventTime, buildings, resources, name, status, finalDoorTimes
+        formattedEventDate, extractedEventTime, buildings, name, status, finalDoorTimes
     ].join('|');
 
     if (!seenRows[rowKey]) {
@@ -1352,4 +1352,5 @@ function trimSheet(sheetName) {
 // =======================================================================================
 // --- END Inserted Code from Stage3.gs ---
 // =======================================================================================
+
 
