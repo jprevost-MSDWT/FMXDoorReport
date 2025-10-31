@@ -1,7 +1,7 @@
 // Project Name: Door Report Full
 // Project Version: 5.0
 // Filename: Door Report ALL.gs
-// File Version: 5.07
+// File Version: 5.08
 // Description: A combined file of all .gs scripts for easy testing.
 
 // =======================================================================================
@@ -261,7 +261,7 @@ function runSecondScript(shouldProcess) {
 
 function formatDate(date) {
   var year = date.getFullYear();
-  var month = ('0' + (date.getMonth() + 1)).slice(-2);
+  var month = ('0' (date.getMonth() + 1)).slice(-2);
   var day = ('0' + date.getDate()).slice(-2);
   return year + '-' + month + '-' + day;
 }
@@ -354,7 +354,7 @@ function importData(fileContent, fileType) {
 // --- BEGIN Inserted Code from Stage1.gs ---
 // =======================================================================================
 
-// This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes duplicates, and sorts.
+// This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes licates, and sorts.
 
 function FMX_Doors_AutoImport_V8() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -545,7 +545,7 @@ function FMX_Doors_AutoImport_V8() {
     }).join('\n');
 
     var rowKey = [
-        formattedEventDate, extractedEventTime, buildings, resources, name, status, finalDoorTimes
+        formattedEventDate, extractedEventTime, buildings, name, status, finalDoorTimes
     ].join('|');
 
     if (!seenRows[rowKey]) {
