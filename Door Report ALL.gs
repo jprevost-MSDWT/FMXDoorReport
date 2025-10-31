@@ -354,7 +354,7 @@ function importData(fileContent, fileType) {
 // --- BEGIN Inserted Code from Stage1.gs ---
 // =======================================================================================
 
-// This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes licates, and sorts.
+// This script processes FMX door data from "Import" to "Output-Helper1", replaces building names, removes duplicates, and sorts.
 
 function FMX_Doors_AutoImport_V8() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
